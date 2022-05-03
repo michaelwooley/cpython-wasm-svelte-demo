@@ -5,13 +5,21 @@
 		"checkJs": true,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
-		"lib": ["es2020", "DOM"],
+		"lib": ["es2020", "DOM", "WebWorker"],
 		"moduleResolution": "node",
 		"module": "es2020",
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"sourceMap": true,
 		"strict": true,
-		"target": "es2020"
+		"target": "es2020",
+		"paths": {
+			"$lib": ["src/lib"],
+			"$lib/*": ["src/lib/*"],
+			"$components": ["src/components"],
+			"$components/*": ["src/components/*"],
+			"$containers": ["src/containers"],
+			"$containers/*": ["src/containers/*"]
+		}
 	}
 }
