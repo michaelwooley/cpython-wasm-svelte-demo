@@ -40,9 +40,7 @@ const config = {
 				}
 			},
 
-			build: {
-				ssr: false
-			},
+			build: {},
 
 			server: {
 				headers: {
