@@ -1,6 +1,17 @@
 {
 	"name": "cpython-wasm-svelte-demo",
+	"description": "Minimal svelte app running python 3.11 compiled to wasm.",
 	"version": "0.0.1",
+	"author": {
+		"name": "Michael Wooley",
+		"email": "wm.wooley@gmail.com"
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/michaelwooley/cpython-wasm-svelte-demo.git"
+	},
+	"readme": "README.md",
 	"scripts": {
 		"dev": "svelte-kit dev",
 		"build": "rm -rf .netlify build .svelte-kit && svelte-kit build",
