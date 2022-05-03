@@ -5,5 +5,7 @@ publish = "build"
 [[headers]]
 for = "/*"
 [headers.values]
+# TODO Adapter does not respect headers... does this matter for actual build?
+# REFERENCE https://github.com/sveltejs/kit/blob/master/packages/adapter-netlify/index.js#L77
 Cross-Origin-Opener-Policy = "same-origin"
 Cross-Origin-Embedder-Policy = "require-corp"

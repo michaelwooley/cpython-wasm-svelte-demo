@@ -42,6 +42,10 @@ const config = {
 				}
 			},
 
+			build: {
+				ssr: false
+			},
+
 			server: {
 				headers: {
 					// Needed to allow SharedArrayBuffer to squeak through on some browsers....
