@@ -11,6 +11,7 @@ const DEFAULT_CPYTHON_DIR = path.join(baseDir, '../../misc-pkg/cpython');
 const DEFAULT_CPYTHON_BUILD_SUBDIR = 'build/emscripten-browser';
 const DEFAULT_PY_WASM_LIB = './src/lib/pywasm';
 
+// TODO Pull in aux scripts from ./scripts/pywasm.aux at time of copy.
 void (async function () {
 	logWithEmoji(chalk.blue('Compiling python w/ emscripten.'), '🏗️');
 
