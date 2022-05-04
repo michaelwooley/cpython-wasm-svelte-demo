@@ -16,6 +16,7 @@
 		"dev": "svelte-kit dev",
 		"build": "rm -rf .netlify build .svelte-kit && svelte-kit build",
 		"build:wasm": "TS_NODE_PROJECT=./scripts/tsconfig.json ts-node ./scripts/add-demo.ts",
+		"build:py": "TS_NODE_PROJECT=./scripts/tsconfig.json ts-node ./scripts/buildpy.ts",
 		"package": "svelte-kit package",
 		"preview": "svelte-kit preview",
 		"prepare": "svelte-kit sync",

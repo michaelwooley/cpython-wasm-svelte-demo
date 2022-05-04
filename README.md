@@ -9,7 +9,7 @@ Relative to that demo, this one removes some complexity (specifically, related t
 - Typescript
 - Integration into a svelte app rather than vanilla html.
 
-## Developing
+# Developing
 
 To get started:
 
@@ -26,6 +26,12 @@ npm run build
 # Preview the production build:
 npm run preview
 ```
+
+## Modified cpython Branch
+
+This uses a cpython branch ([`michaelwooley:michael/demo-app-modificaitons`](https://github.com/michaelwooley/cpython/tree/michael/demo-app-modificaitons)) that adds several compilation flags.
+
+[Here is a link to a comparison on GitHub.](https://github.com/michaelwooley/cpython/compare/main...michaelwooley:michael/demo-app-modificaitons)
 
 # Links
 
