@@ -10,6 +10,7 @@
 	let mod: AddModule;
 	onMount(async () => {
 		mod = await createAddModule();
+		console.log(mod);
 		handleChange();
 	});
 

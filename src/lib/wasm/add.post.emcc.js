@@ -5,4 +5,6 @@
 Module['onRuntimeInitialized'] = function () {
 	// Just Module._add() will work, but I'm just demontrating usage of cwrap
 	Module['add'] = cwrap('add', 'number', ['number', 'number']);
+	// Module['noExitRuntime'] = keepRuntimeAlive();
+	console.log('Keep runtime alive? ', keepRuntimeAlive(), noExitRuntime);
 };
