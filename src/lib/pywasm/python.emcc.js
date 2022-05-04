@@ -185,12 +185,12 @@ var createPythonModule = (() => {
 			};
 			loadPackage({
 				files: [
-					{ filename: '/usr/local/lib/python311.zip', start: 0, end: 3196262 },
-					{ filename: '/usr/local/lib/python3.11/os.py', start: 3196262, end: 3235727 },
-					{ filename: '/usr/local/lib/python3.11/lib-dynload/.empty', start: 3235727, end: 3235727 }
+					{ filename: '/usr/local/lib/python311.zip', start: 0, end: 3196312 },
+					{ filename: '/usr/local/lib/python3.11/os.py', start: 3196312, end: 3235777 },
+					{ filename: '/usr/local/lib/python3.11/lib-dynload/.empty', start: 3235777, end: 3235777 }
 				],
-				remote_package_size: 3235727,
-				package_uuid: '741566d5-ae2a-4cb1-9bb3-2c337c5cd11b'
+				remote_package_size: 3235777,
+				package_uuid: 'e213b3c3-4a9c-4217-9b25-17a2135cceeb'
 			});
 		})();
 		var moduleOverrides = Object.assign({}, Module);
@@ -284,6 +284,67 @@ var createPythonModule = (() => {
 			if (!condition) {
 				abort(text);
 			}
+		}
+		function getCFunc(ident) {
+			var func = Module['_' + ident];
+			return func;
+		}
+		function ccall(ident, returnType, argTypes, args, opts) {
+			var toC = {
+				string: function (str) {
+					var ret = 0;
+					if (str !== null && str !== undefined && str !== 0) {
+						var len = (str.length << 2) + 1;
+						ret = stackAlloc(len);
+						stringToUTF8(str, ret, len);
+					}
+					return ret;
+				},
+				array: function (arr) {
+					var ret = stackAlloc(arr.length);
+					writeArrayToMemory(arr, ret);
+					return ret;
+				}
+			};
+			function convertReturnValue(ret) {
+				if (returnType === 'string') return UTF8ToString(ret);
+				if (returnType === 'boolean') return Boolean(ret);
+				return ret;
+			}
+			var func = getCFunc(ident);
+			var cArgs = [];
+			var stack = 0;
+			if (args) {
+				for (var i = 0; i < args.length; i++) {
+					var converter = toC[argTypes[i]];
+					if (converter) {
+						if (stack === 0) stack = stackSave();
+						cArgs[i] = converter(args[i]);
+					} else {
+						cArgs[i] = args[i];
+					}
+				}
+			}
+			var ret = func.apply(null, cArgs);
+			function onDone(ret) {
+				if (stack !== 0) stackRestore(stack);
+				return convertReturnValue(ret);
+			}
+			ret = onDone(ret);
+			return ret;
+		}
+		function cwrap(ident, returnType, argTypes, opts) {
+			argTypes = argTypes || [];
+			var numericArgs = argTypes.every(function (type) {
+				return type === 'number';
+			});
+			var numericRet = returnType !== 'string';
+			if (numericRet && numericArgs && !opts) {
+				return getCFunc(ident);
+			}
+			return function () {
+				return ccall(ident, returnType, argTypes, arguments, opts);
+			};
 		}
 		var UTF8Decoder = typeof TextDecoder != 'undefined' ? new TextDecoder('utf8') : undefined;
 		function UTF8ArrayToString(heapOrArray, idx, maxBytesToRead) {
@@ -6481,10 +6542,17 @@ var createPythonModule = (() => {
 			return (_emscripten_builtin_memalign = Module['_emscripten_builtin_memalign'] =
 				Module['asm']['Pa']).apply(null, arguments);
 		});
+		var stackSave = (Module['stackSave'] = function () {
+			return (stackSave = Module['stackSave'] = Module['asm']['Qa']).apply(null, arguments);
+		});
+		var stackRestore = (Module['stackRestore'] = function () {
+			return (stackRestore = Module['stackRestore'] = Module['asm']['Ra']).apply(null, arguments);
+		});
 		var stackAlloc = (Module['stackAlloc'] = function () {
-			return (stackAlloc = Module['stackAlloc'] = Module['asm']['Qa']).apply(null, arguments);
+			return (stackAlloc = Module['stackAlloc'] = Module['asm']['Sa']).apply(null, arguments);
 		});
 		var _Py_EMSCRIPTEN_SIGNAL_HANDLING = (Module['_Py_EMSCRIPTEN_SIGNAL_HANDLING'] = 3379008);
+		Module['cwrap'] = cwrap;
 		Module['addRunDependency'] = addRunDependency;
 		Module['removeRunDependency'] = removeRunDependency;
 		Module['FS_createPath'] = FS.createPath;
@@ -6576,7 +6644,7 @@ var createPythonModule = (() => {
 				Module['preInit'].pop()();
 			}
 		}
-		var shouldRunNow = true;
+		var shouldRunNow = false;
 		if (Module['noInitialRun']) shouldRunNow = false;
 		run();
 
