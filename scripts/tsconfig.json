@@ -5,14 +5,18 @@
 		"swc": true,
 		"require": ["ts-node/register", "tsconfig-paths/register"],
 		"files": false,
-		"cwd": "..",
+		"cwd": "../..",
 		"experimentalResolverFeatures": false,
+		"scopeDir": "..",
 		"compilerOptions": {
-			"module": "ESNext"
+			"module": "esnext",
+			"rootDir": ".."
 		}
 	},
 	"compilerOptions": {
+		"module": "es2022",
 		"baseUrl": "..",
+		"rootDir": "..",
 		"rootDirs": ["..", "../.svelte-kit/types"],
 		"paths": {
 			"$lib": ["src/lib"],
