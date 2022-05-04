@@ -23,5 +23,5 @@
 		}
 	},
 	"include": ["src/**/*.js", "src/**/*.ts", "src/**/*.d.ts", "src/**/*.svelte"],
-	"exclude": ["node_modules/**", "./.svelte-kit/**", "src/**/*.emcc.js", "scripts/**"]
+	"exclude": ["node_modules/**", "./.svelte-kit/**", "./src/**/*.emcc.js", "scripts/**"]
 }

@@ -1,16 +1,9 @@
 <script lang="ts" context="module">
-	export const prerender = false;
+	export const prerender = true;
 </script>
 
 <script lang="ts">
-	import { onMount } from 'svelte';
-
-	onMount(() => {
-		if (!SharedArrayBuffer) {
-			alert('No shared array buffer??');
-		}
-	});
+	import AddDemo from '$containers/AddDemo.svelte';
 </script>
 
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to read the documentation</p>
+<AddDemo />

@@ -1,8 +1,8 @@
-var create_add_module = (() => {
+var createAddModule = (() => {
 	var _scriptDir = import.meta.url;
 
-	return function (create_add_module) {
-		create_add_module = create_add_module || {};
+	return function (createAddModule) {
+		createAddModule = createAddModule || {};
 
 		// The Module object: Our interface to the outside world. We import
 		// and export values on it. There are various ways Module can be used:
@@ -17,7 +17,7 @@ var create_add_module = (() => {
 		// after the generated code, you will need to define   var Module = {};
 		// before the code. Then that object will be used in the code, and you
 		// can continue to use Module afterwards as well.
-		var Module = typeof create_add_module != 'undefined' ? create_add_module : {};
+		var Module = typeof createAddModule != 'undefined' ? createAddModule : {};
 
 		// See https://caniuse.com/mdn-javascript_builtins_object_assign
 
@@ -2591,7 +2591,7 @@ var create_add_module = (() => {
 			Module['add'] = cwrap('add', 'number', ['number', 'number']);
 		};
 
-		return create_add_module.ready;
+		return createAddModule.ready;
 	};
 })();
-export default create_add_module;
+export default createAddModule;

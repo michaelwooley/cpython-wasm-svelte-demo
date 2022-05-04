@@ -20,7 +20,7 @@ void (async function () {
     -s EXPORTED_FUNCTIONS="['_add']" \
     -s MODULARIZE=1 \
     -s EXPORT_ES6=1 \
-    -s EXPORT_NAME="create_add_module" \
+    -s EXPORT_NAME="createAddModule" \
     --post-js add.post.emcc.js`;
 	const compileTime = (performance.now() - tic) / 1000;
 
