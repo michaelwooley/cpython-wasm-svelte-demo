@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "ts-node": {
+    "esm": true
+  },
+  "compilerOptions": {
+    "module": "ESNext",
+    "outDir": "./scripts"
+  },
+  "include": [
+    "src/**/*.js",
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/**/*.svelte",
+    "scripts/*.ts"
+  ],
+  "exclude": ["node_modules/**", "./.svelte-kit/**", "src/**/*.emcc.js"]
+}
