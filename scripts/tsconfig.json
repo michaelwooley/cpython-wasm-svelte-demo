@@ -1,0 +1,34 @@
+{
+	"extends": "../tsconfig.json",
+	"ts-node": {
+		"esm": true,
+		"swc": true,
+		"require": ["ts-node/register", "tsconfig-paths/register"],
+		"files": false,
+		"cwd": "../..",
+		"experimentalResolverFeatures": false,
+		"scopeDir": "..",
+		"compilerOptions": {
+			"module": "esnext",
+			"rootDir": ".."
+		}
+	},
+	"compilerOptions": {
+		"module": "es2022",
+		"baseUrl": "..",
+		"rootDir": "..",
+		"rootDirs": ["..", "../.svelte-kit/types"],
+		"paths": {
+			"$lib": ["src/lib"],
+			"$lib/*": ["src/lib/*"],
+			"$components": ["src/components"],
+			"$components/*": ["src/components/*"],
+			"$containers": ["src/containers"],
+			"$containers/*": ["src/containers/*"],
+			"$scripts": ["scripts"],
+			"$scripts/*": ["scripts/*"]
+		}
+	},
+	"include": ["../src/**/*.js", "../src/**/*.ts", "../src/**/*.d.ts", "../src/**/*.svelte", "*.ts"],
+	"exclude": ["../node_modules/**", "../.svelte-kit/**", "../src/**/*.emcc.js"]
+}
