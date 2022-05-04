@@ -14,4 +14,4 @@ export interface AddModule extends EmscriptenModule {
 	add(a: number, b: number): number;
 }
 
-export default function create_ffmpeg_module(mod?: any): AddModule;
+export default function create_ffmpeg_module(mod?: EmscriptenModule): AddModule;
