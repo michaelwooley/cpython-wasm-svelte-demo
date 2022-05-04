@@ -14,6 +14,10 @@ const config = {
 		})
 	],
 
+	compilerOptions: {
+		generate: 'dom' //
+	},
+
 	kit: {
 		adapter: adapter({
 			// We don't need any of netlify's edge functions, etc.

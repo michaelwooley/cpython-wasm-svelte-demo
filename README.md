@@ -9,7 +9,6 @@ Relative to that demo, this one removes some complexity (specifically, related t
 - Typescript
 - Integration into a svelte app rather than vanilla html.
 
-
 ## Developing
 
 To get started:
