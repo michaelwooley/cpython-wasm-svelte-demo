@@ -6,6 +6,6 @@ node_modules
 .env
 .env.*
 !.env.example
-/cpython
+/.cpython
 /scratch
 /.netlify
