@@ -4,6 +4,42 @@ var createPythonModule = (() => {
 	return function (createPythonModule) {
 		createPythonModule = createPythonModule || {};
 
+		function GROWABLE_HEAP_I8() {
+			if (wasmMemory.buffer != buffer) {
+				updateGlobalBufferAndViews(wasmMemory.buffer);
+			}
+			return HEAP8;
+		}
+		function GROWABLE_HEAP_U8() {
+			if (wasmMemory.buffer != buffer) {
+				updateGlobalBufferAndViews(wasmMemory.buffer);
+			}
+			return HEAPU8;
+		}
+		function GROWABLE_HEAP_I16() {
+			if (wasmMemory.buffer != buffer) {
+				updateGlobalBufferAndViews(wasmMemory.buffer);
+			}
+			return HEAP16;
+		}
+		function GROWABLE_HEAP_U16() {
+			if (wasmMemory.buffer != buffer) {
+				updateGlobalBufferAndViews(wasmMemory.buffer);
+			}
+			return HEAPU16;
+		}
+		function GROWABLE_HEAP_I32() {
+			if (wasmMemory.buffer != buffer) {
+				updateGlobalBufferAndViews(wasmMemory.buffer);
+			}
+			return HEAP32;
+		}
+		function GROWABLE_HEAP_F64() {
+			if (wasmMemory.buffer != buffer) {
+				updateGlobalBufferAndViews(wasmMemory.buffer);
+			}
+			return HEAPF64;
+		}
 		var Module = typeof createPythonModule != 'undefined' ? createPythonModule : {};
 		var readyPromiseResolve, readyPromiseReject;
 		Module['ready'] = new Promise(function (resolve, reject) {
@@ -185,12 +221,12 @@ var createPythonModule = (() => {
 			};
 			loadPackage({
 				files: [
-					{ filename: '/usr/local/lib/python311.zip', start: 0, end: 3196312 },
-					{ filename: '/usr/local/lib/python3.11/os.py', start: 3196312, end: 3235777 },
-					{ filename: '/usr/local/lib/python3.11/lib-dynload/.empty', start: 3235777, end: 3235777 }
+					{ filename: '/usr/local/lib/python311.zip', start: 0, end: 3196339 },
+					{ filename: '/usr/local/lib/python3.11/os.py', start: 3196339, end: 3235804 },
+					{ filename: '/usr/local/lib/python3.11/lib-dynload/.empty', start: 3235804, end: 3235804 }
 				],
-				remote_package_size: 3235777,
-				package_uuid: 'e213b3c3-4a9c-4217-9b25-17a2135cceeb'
+				remote_package_size: 3235804,
+				package_uuid: 'ef8b8df4-b940-4490-be72-133220fb2b5e'
 			});
 		})();
 		var moduleOverrides = Object.assign({}, Module);
@@ -205,6 +241,7 @@ var createPythonModule = (() => {
 			typeof process == 'object' &&
 			typeof process.versions == 'object' &&
 			typeof process.versions.node == 'string';
+		var ENVIRONMENT_IS_PTHREAD = Module['ENVIRONMENT_IS_PTHREAD'] || false;
 		var scriptDirectory = '';
 		function locateFile(path) {
 			if (Module['locateFile']) {
@@ -271,6 +308,16 @@ var createPythonModule = (() => {
 		if (Module['arguments']) arguments_ = Module['arguments'];
 		if (Module['thisProgram']) thisProgram = Module['thisProgram'];
 		if (Module['quit']) quit_ = Module['quit'];
+		function warnOnce(text) {
+			if (!warnOnce.shown) warnOnce.shown = {};
+			if (!warnOnce.shown[text]) {
+				warnOnce.shown[text] = 1;
+				err(text);
+			}
+		}
+		var Atomics_load = Atomics.load;
+		var Atomics_store = Atomics.store;
+		var Atomics_compareExchange = Atomics.compareExchange;
 		var wasmBinary;
 		if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];
 		var noExitRuntime = Module['noExitRuntime'] || true;
@@ -278,6 +325,7 @@ var createPythonModule = (() => {
 			abort('no native wasm support detected');
 		}
 		var wasmMemory;
+		var wasmModule;
 		var ABORT = false;
 		var EXITSTATUS;
 		function assert(condition, text) {
@@ -352,7 +400,11 @@ var createPythonModule = (() => {
 			var endPtr = idx;
 			while (heapOrArray[endPtr] && !(endPtr >= endIdx)) ++endPtr;
 			if (endPtr - idx > 16 && heapOrArray.buffer && UTF8Decoder) {
-				return UTF8Decoder.decode(heapOrArray.subarray(idx, endPtr));
+				return UTF8Decoder.decode(
+					heapOrArray.buffer instanceof SharedArrayBuffer
+						? heapOrArray.slice(idx, endPtr)
+						: heapOrArray.subarray(idx, endPtr)
+				);
 			} else {
 				var str = '';
 				while (idx < endPtr) {
@@ -383,7 +435,7 @@ var createPythonModule = (() => {
 			return str;
 		}
 		function UTF8ToString(ptr, maxBytesToRead) {
-			return ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead) : '';
+			return ptr ? UTF8ArrayToString(GROWABLE_HEAP_U8(), ptr, maxBytesToRead) : '';
 		}
 		function stringToUTF8Array(str, heap, outIdx, maxBytesToWrite) {
 			if (!(maxBytesToWrite > 0)) return 0;
@@ -419,7 +471,7 @@ var createPythonModule = (() => {
 			return outIdx - startIdx;
 		}
 		function stringToUTF8(str, outPtr, maxBytesToWrite) {
-			return stringToUTF8Array(str, HEAPU8, outPtr, maxBytesToWrite);
+			return stringToUTF8Array(str, GROWABLE_HEAP_U8(), outPtr, maxBytesToWrite);
 		}
 		function lengthBytesUTF8(str) {
 			var len = 0;
@@ -437,25 +489,28 @@ var createPythonModule = (() => {
 		function allocateUTF8(str) {
 			var size = lengthBytesUTF8(str) + 1;
 			var ret = _malloc(size);
-			if (ret) stringToUTF8Array(str, HEAP8, ret, size);
+			if (ret) stringToUTF8Array(str, GROWABLE_HEAP_I8(), ret, size);
 			return ret;
 		}
 		function allocateUTF8OnStack(str) {
 			var size = lengthBytesUTF8(str) + 1;
 			var ret = stackAlloc(size);
-			stringToUTF8Array(str, HEAP8, ret, size);
+			stringToUTF8Array(str, GROWABLE_HEAP_I8(), ret, size);
 			return ret;
 		}
 		function writeArrayToMemory(array, buffer) {
-			HEAP8.set(array, buffer);
+			GROWABLE_HEAP_I8().set(array, buffer);
 		}
 		function writeAsciiToMemory(str, buffer, dontAddNull) {
 			for (var i = 0; i < str.length; ++i) {
-				HEAP8[buffer++ >> 0] = str.charCodeAt(i);
+				GROWABLE_HEAP_I8()[buffer++ >> 0] = str.charCodeAt(i);
 			}
-			if (!dontAddNull) HEAP8[buffer >> 0] = 0;
+			if (!dontAddNull) GROWABLE_HEAP_I8()[buffer >> 0] = 0;
 		}
 		var buffer, HEAP8, HEAPU8, HEAP16, HEAPU16, HEAP32, HEAPU32, HEAPF32, HEAPF64;
+		if (ENVIRONMENT_IS_PTHREAD) {
+			buffer = Module['buffer'];
+		}
 		function updateGlobalBufferAndViews(buf) {
 			buffer = buf;
 			Module['HEAP8'] = HEAP8 = new Int8Array(buf);
@@ -468,6 +523,42 @@ var createPythonModule = (() => {
 			Module['HEAPF64'] = HEAPF64 = new Float64Array(buf);
 		}
 		var INITIAL_MEMORY = Module['INITIAL_MEMORY'] || 20971520;
+		if (ENVIRONMENT_IS_PTHREAD) {
+			wasmMemory = Module['wasmMemory'];
+			buffer = Module['buffer'];
+		} else {
+			if (Module['wasmMemory']) {
+				wasmMemory = Module['wasmMemory'];
+			} else {
+				wasmMemory = new WebAssembly.Memory({
+					initial: INITIAL_MEMORY / 65536,
+					maximum: 2147483648 / 65536,
+					shared: true
+				});
+				console.log(wasmMemory.buffer, typeof SharedArrayBuffer);
+				if (
+					!(
+						wasmMemory.buffer.toString() === '[object SharedArrayBuffer]' ||
+						wasmMemory.buffer instanceof SharedArrayBuffer
+					)
+				) {
+					err(
+						'requested a shared WebAssembly.Memory but the returned buffer is not a SharedArrayBuffer, indicating that while the browser has SharedArrayBuffer it does not have WebAssembly threads support - you may need to set a flag'
+					);
+					if (ENVIRONMENT_IS_NODE) {
+						console.log(
+							'(on node you may need: --experimental-wasm-threads --experimental-wasm-bulk-memory and also use a recent version)'
+						);
+					}
+					throw Error('bad memory');
+				}
+			}
+		}
+		if (wasmMemory) {
+			buffer = wasmMemory.buffer;
+		}
+		INITIAL_MEMORY = buffer.byteLength;
+		updateGlobalBufferAndViews(buffer);
 		var wasmTable;
 		var __ATPRERUN__ = [];
 		var __ATINIT__ = [];
@@ -488,6 +579,7 @@ var createPythonModule = (() => {
 		}
 		function initRuntime() {
 			runtimeInitialized = true;
+			if (ENVIRONMENT_IS_PTHREAD) return;
 			if (!Module['noFSInit'] && !FS.init.initialized) FS.init();
 			FS.ignorePermissions = false;
 			TTY.init();
@@ -496,9 +588,11 @@ var createPythonModule = (() => {
 			callRuntimeCallbacks(__ATINIT__);
 		}
 		function preMain() {
+			if (ENVIRONMENT_IS_PTHREAD) return;
 			callRuntimeCallbacks(__ATMAIN__);
 		}
 		function postRun() {
+			if (ENVIRONMENT_IS_PTHREAD) return;
 			if (Module['postRun']) {
 				if (typeof Module['postRun'] == 'function') Module['postRun'] = [Module['postRun']];
 				while (Module['postRun'].length) {
@@ -546,7 +640,9 @@ var createPythonModule = (() => {
 			}
 		}
 		function abort(what) {
-			{
+			if (ENVIRONMENT_IS_PTHREAD) {
+				postMessage({ cmd: 'onAbort', arg: what });
+			} else {
 				if (Module['onAbort']) {
 					Module['onAbort'](what);
 				}
@@ -611,15 +707,19 @@ var createPythonModule = (() => {
 			function receiveInstance(instance, module) {
 				var exports = instance.exports;
 				Module['asm'] = exports;
-				wasmMemory = Module['asm']['Ga'];
-				updateGlobalBufferAndViews(wasmMemory.buffer);
-				wasmTable = Module['asm']['Ka'];
-				addOnInit(Module['asm']['Ha']);
-				removeRunDependency('wasm-instantiate');
+				registerTlsInit(Module['asm']['$a']);
+				wasmTable = Module['asm']['Va'];
+				addOnInit(Module['asm']['Sa']);
+				wasmModule = module;
+				if (!ENVIRONMENT_IS_PTHREAD) {
+					removeRunDependency('wasm-instantiate');
+				}
 			}
-			addRunDependency('wasm-instantiate');
+			if (!ENVIRONMENT_IS_PTHREAD) {
+				addRunDependency('wasm-instantiate');
+			}
 			function receiveInstantiationResult(result) {
-				receiveInstance(result['instance']);
+				receiveInstance(result['instance'], result['module']);
 			}
 			function instantiateArrayBuffer(receiver) {
 				return getBinaryPromise()
@@ -667,6 +767,7 @@ var createPythonModule = (() => {
 		}
 		var tempDouble;
 		var tempI64;
+		var ASM_CONSTS = {};
 		function _Py_CheckEmscriptenSignals_Helper() {
 			if (!Module.Py_EmscriptenSignalBuffer) {
 				return 0;
@@ -712,6 +813,235 @@ var createPythonModule = (() => {
 				}
 			}
 		}
+		function withStackSave(f) {
+			var stack = stackSave();
+			var ret = f();
+			stackRestore(stack);
+			return ret;
+		}
+		function killThread(pthread_ptr) {
+			GROWABLE_HEAP_I32()[pthread_ptr >> 2] = 0;
+			var pthread = PThread.pthreads[pthread_ptr];
+			delete PThread.pthreads[pthread_ptr];
+			pthread.worker.terminate();
+			__emscripten_thread_free_data(pthread_ptr);
+			PThread.runningWorkers.splice(PThread.runningWorkers.indexOf(pthread.worker), 1);
+			pthread.worker.pthread = undefined;
+		}
+		function cancelThread(pthread_ptr) {
+			var pthread = PThread.pthreads[pthread_ptr];
+			pthread.worker.postMessage({ cmd: 'cancel' });
+		}
+		function cleanupThread(pthread_ptr) {
+			var pthread = PThread.pthreads[pthread_ptr];
+			if (pthread) {
+				GROWABLE_HEAP_I32()[pthread_ptr >> 2] = 0;
+				var worker = pthread.worker;
+				PThread.returnWorkerToPool(worker);
+			}
+		}
+		function zeroMemory(address, size) {
+			GROWABLE_HEAP_U8().fill(0, address, address + size);
+		}
+		function spawnThread(threadParams) {
+			var worker = PThread.getNewWorker();
+			if (!worker) {
+				return 6;
+			}
+			PThread.runningWorkers.push(worker);
+			var pthread = (PThread.pthreads[threadParams.pthread_ptr] = {
+				worker: worker,
+				threadInfoStruct: threadParams.pthread_ptr
+			});
+			worker.pthread = pthread;
+			var msg = {
+				cmd: 'run',
+				start_routine: threadParams.startRoutine,
+				arg: threadParams.arg,
+				threadInfoStruct: threadParams.pthread_ptr
+			};
+			worker.runPthread = () => {
+				msg.time = performance.now();
+				worker.postMessage(msg, threadParams.transferList);
+			};
+			if (worker.loaded) {
+				worker.runPthread();
+				delete worker.runPthread;
+			}
+			return 0;
+		}
+		function _exit(status) {
+			exit(status);
+		}
+		function handleException(e) {
+			if (e instanceof ExitStatus || e == 'unwind') {
+				return EXITSTATUS;
+			}
+			quit_(1, e);
+		}
+		var PThread = {
+			unusedWorkers: [],
+			runningWorkers: [],
+			tlsInitFunctions: [],
+			init: function () {
+				if (ENVIRONMENT_IS_PTHREAD) {
+					PThread.initWorker();
+				} else {
+					PThread.initMainThread();
+				}
+			},
+			initMainThread: function () {},
+			initWorker: function () {
+				noExitRuntime = false;
+			},
+			pthreads: {},
+			setExitStatus: function (status) {
+				EXITSTATUS = status;
+			},
+			terminateAllThreads: function () {
+				for (var t in PThread.pthreads) {
+					var pthread = PThread.pthreads[t];
+					if (pthread && pthread.worker) {
+						PThread.returnWorkerToPool(pthread.worker);
+					}
+				}
+				for (var i = 0; i < PThread.unusedWorkers.length; ++i) {
+					var worker = PThread.unusedWorkers[i];
+					worker.terminate();
+				}
+				PThread.unusedWorkers = [];
+			},
+			returnWorkerToPool: function (worker) {
+				PThread.runWithoutMainThreadQueuedCalls(function () {
+					delete PThread.pthreads[worker.pthread.threadInfoStruct];
+					PThread.unusedWorkers.push(worker);
+					PThread.runningWorkers.splice(PThread.runningWorkers.indexOf(worker), 1);
+					__emscripten_thread_free_data(worker.pthread.threadInfoStruct);
+					worker.pthread = undefined;
+				});
+			},
+			runWithoutMainThreadQueuedCalls: function (func) {
+				GROWABLE_HEAP_I32()[__emscripten_allow_main_runtime_queued_calls >> 2] = 0;
+				try {
+					func();
+				} finally {
+					GROWABLE_HEAP_I32()[__emscripten_allow_main_runtime_queued_calls >> 2] = 1;
+				}
+			},
+			receiveObjectTransfer: function (data) {},
+			threadInit: function () {
+				for (var i in PThread.tlsInitFunctions) {
+					if (PThread.tlsInitFunctions.hasOwnProperty(i)) PThread.tlsInitFunctions[i]();
+				}
+			},
+			loadWasmModuleToWorker: function (worker, onFinishedLoading) {
+				worker.onmessage = (e) => {
+					console.log(e.data);
+
+					var d = e['data'];
+					var cmd = d['cmd'];
+					if (worker.pthread)
+						PThread.currentProxiedOperationCallerThread = worker.pthread.threadInfoStruct;
+					if (d['targetThread'] && d['targetThread'] != _pthread_self()) {
+						var thread = PThread.pthreads[d.targetThread];
+						if (thread) {
+							thread.worker.postMessage(d, d['transferList']);
+						} else {
+							err(
+								'Internal error! Worker sent a message "' +
+									cmd +
+									'" to target pthread ' +
+									d['targetThread'] +
+									', but that thread no longer exists!'
+							);
+						}
+						PThread.currentProxiedOperationCallerThread = undefined;
+						return;
+					}
+					if (cmd === 'processProxyingQueue') {
+						executeNotifiedProxyingQueue(d['queue']);
+					} else if (cmd === 'spawnThread') {
+						spawnThread(d);
+					} else if (cmd === 'cleanupThread') {
+						cleanupThread(d['thread']);
+					} else if (cmd === 'killThread') {
+						killThread(d['thread']);
+					} else if (cmd === 'cancelThread') {
+						cancelThread(d['thread']);
+					} else if (cmd === 'loaded') {
+						worker.loaded = true;
+						if (onFinishedLoading) onFinishedLoading(worker);
+						if (worker.runPthread) {
+							worker.runPthread();
+							delete worker.runPthread;
+						}
+					} else if (cmd === 'print') {
+						out('Thread ' + d['threadId'] + ': ' + d['text']);
+					} else if (cmd === 'printErr') {
+						err('Thread ' + d['threadId'] + ': ' + d['text']);
+					} else if (cmd === 'alert') {
+						alert('Thread ' + d['threadId'] + ': ' + d['text']);
+					} else if (d.target === 'setimmediate') {
+						worker.postMessage(d);
+					} else if (cmd === 'onAbort') {
+						if (Module['onAbort']) {
+							Module['onAbort'](d['arg']);
+						}
+					} else if (cmd) {
+						err('worker sent an unknown command ' + cmd);
+					}
+					PThread.currentProxiedOperationCallerThread = undefined;
+				};
+				worker.onerror = (e) => {
+					var message = 'worker sent an error!';
+					err(message + ' ' + e.filename + ':' + e.lineno + ': ' + e.message);
+					throw e;
+				};
+
+				worker.postMessage({
+					cmd: 'load',
+					urlOrBlob: locateFile('python.emcc.js'),
+					wasmMemory: wasmMemory,
+					wasmModule: wasmModule
+				});
+			},
+			allocateUnusedWorker: function () {
+				if (!Module['locateFile']) {
+					// PThread.unusedWorkers.push(
+					// 	new Worker(new URL('python.worker.emcc.umd', import.meta.url))
+					// );
+					// return;
+					throw new Error('Must include locateFile!!');
+				}
+
+				var pthreadMainJs = locateFile('python.worker.emcc.umd');
+				PThread.unusedWorkers.push(new Worker(pthreadMainJs));
+			},
+			getNewWorker: function () {
+				if (PThread.unusedWorkers.length == 0) {
+					PThread.allocateUnusedWorker();
+					PThread.loadWasmModuleToWorker(PThread.unusedWorkers[0]);
+				}
+				return PThread.unusedWorkers.pop();
+			}
+		};
+		function establishStackSpace() {
+			var pthread_ptr = _pthread_self();
+			var stackTop = GROWABLE_HEAP_I32()[(pthread_ptr + 44) >> 2];
+			var stackSize = GROWABLE_HEAP_I32()[(pthread_ptr + 48) >> 2];
+			var stackMax = stackTop - stackSize;
+			_emscripten_stack_set_limits(stackTop, stackMax);
+			stackRestore(stackTop);
+		}
+		Module['establishStackSpace'] = establishStackSpace;
+		function exitOnMainThread(returnCode) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(1, 0, returnCode);
+			try {
+				_exit(returnCode);
+			} catch (e) {
+				handleException(e);
+			}
+		}
 		var wasmTableMirror = [];
 		function getWasmTableEntry(funcPtr) {
 			var func = wasmTableMirror[funcPtr];
@@ -721,22 +1051,64 @@ var createPythonModule = (() => {
 			}
 			return func;
 		}
-		function handleException(e) {
-			if (e instanceof ExitStatus || e == 'unwind') {
-				return EXITSTATUS;
-			}
-			quit_(1, e);
+		function invokeEntryPoint(ptr, arg) {
+			return getWasmTableEntry(ptr)(arg);
+		}
+		Module['invokeEntryPoint'] = invokeEntryPoint;
+		function registerTlsInit(tlsInitFunc) {
+			PThread.tlsInitFunctions.push(tlsInitFunc);
+		}
+		function ___call_main(argc, argv) {
+			noExitRuntime = true;
+			var returnCode = _main(argc, argv);
 		}
 		function ___call_sighandler(fp, sig) {
 			getWasmTableEntry(fp)(sig);
 		}
+		function ___emscripten_init_main_thread_js(tb) {
+			__emscripten_thread_init(tb, !ENVIRONMENT_IS_WORKER, 1, !ENVIRONMENT_IS_WEB);
+			PThread.threadInit();
+		}
+		function ___emscripten_thread_cleanup(thread) {
+			if (!ENVIRONMENT_IS_PTHREAD) cleanupThread(thread);
+			else postMessage({ cmd: 'cleanupThread', thread: thread });
+		}
 		function setErrNo(value) {
-			HEAP32[___errno_location() >> 2] = value;
+			GROWABLE_HEAP_I32()[___errno_location() >> 2] = value;
 			return value;
 		}
 		function ___map_file(pathname, size) {
 			setErrNo(63);
 			return -1;
+		}
+		function pthreadCreateProxied(pthread_ptr, attr, start_routine, arg) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(2, 1, pthread_ptr, attr, start_routine, arg);
+			return ___pthread_create_js(pthread_ptr, attr, start_routine, arg);
+		}
+		function ___pthread_create_js(pthread_ptr, attr, start_routine, arg) {
+			if (typeof SharedArrayBuffer == 'undefined') {
+				err('Current environment does not support SharedArrayBuffer, pthreads are not available!');
+				return 6;
+			}
+			var transferList = [];
+			var error = 0;
+			if (ENVIRONMENT_IS_PTHREAD && (transferList.length === 0 || error)) {
+				return pthreadCreateProxied(pthread_ptr, attr, start_routine, arg);
+			}
+			if (error) return error;
+			var threadParams = {
+				startRoutine: start_routine,
+				pthread_ptr: pthread_ptr,
+				arg: arg,
+				transferList: transferList
+			};
+			if (ENVIRONMENT_IS_PTHREAD) {
+				threadParams.cmd = 'spawnThread';
+				postMessage(threadParams, transferList);
+				return 0;
+			}
+			return spawnThread(threadParams);
 		}
 		var PATH = {
 			isAbs: (path) => path.charAt(0) === '/',
@@ -991,9 +1363,6 @@ var createPythonModule = (() => {
 				}
 			}
 		};
-		function zeroMemory(address, size) {
-			HEAPU8.fill(0, address, address + size);
-		}
 		function alignMemory(size, alignment) {
 			return Math.ceil(size / alignment) * alignment;
 		}
@@ -1219,7 +1588,7 @@ var createPythonModule = (() => {
 					return size;
 				},
 				write: function (stream, buffer, offset, length, position, canOwn) {
-					if (buffer.buffer === HEAP8.buffer) {
+					if (buffer.buffer === GROWABLE_HEAP_I8().buffer) {
 						canOwn = false;
 					}
 					if (!length) return 0;
@@ -1294,7 +1663,7 @@ var createPythonModule = (() => {
 						if (!ptr) {
 							throw new FS.ErrnoError(48);
 						}
-						HEAP8.set(contents, ptr);
+						GROWABLE_HEAP_I8().set(contents, ptr);
 					}
 					return { ptr: ptr, allocated: allocated };
 				},
@@ -3520,15 +3889,15 @@ var createPythonModule = (() => {
 					}
 					throw e;
 				}
-				HEAP32[buf >> 2] = stat.dev;
-				HEAP32[(buf + 4) >> 2] = 0;
-				HEAP32[(buf + 8) >> 2] = stat.ino;
-				HEAP32[(buf + 12) >> 2] = stat.mode;
-				HEAP32[(buf + 16) >> 2] = stat.nlink;
-				HEAP32[(buf + 20) >> 2] = stat.uid;
-				HEAP32[(buf + 24) >> 2] = stat.gid;
-				HEAP32[(buf + 28) >> 2] = stat.rdev;
-				HEAP32[(buf + 32) >> 2] = 0;
+				GROWABLE_HEAP_I32()[buf >> 2] = stat.dev;
+				GROWABLE_HEAP_I32()[(buf + 4) >> 2] = 0;
+				GROWABLE_HEAP_I32()[(buf + 8) >> 2] = stat.ino;
+				GROWABLE_HEAP_I32()[(buf + 12) >> 2] = stat.mode;
+				GROWABLE_HEAP_I32()[(buf + 16) >> 2] = stat.nlink;
+				GROWABLE_HEAP_I32()[(buf + 20) >> 2] = stat.uid;
+				GROWABLE_HEAP_I32()[(buf + 24) >> 2] = stat.gid;
+				GROWABLE_HEAP_I32()[(buf + 28) >> 2] = stat.rdev;
+				GROWABLE_HEAP_I32()[(buf + 32) >> 2] = 0;
 				(tempI64 = [
 					stat.size >>> 0,
 					((tempDouble = stat.size),
@@ -3538,16 +3907,16 @@ var createPythonModule = (() => {
 							: ~~+Math.ceil((tempDouble - +(~~tempDouble >>> 0)) / 4294967296) >>> 0
 						: 0)
 				]),
-					(HEAP32[(buf + 40) >> 2] = tempI64[0]),
-					(HEAP32[(buf + 44) >> 2] = tempI64[1]);
-				HEAP32[(buf + 48) >> 2] = 4096;
-				HEAP32[(buf + 52) >> 2] = stat.blocks;
-				HEAP32[(buf + 56) >> 2] = (stat.atime.getTime() / 1e3) | 0;
-				HEAP32[(buf + 60) >> 2] = 0;
-				HEAP32[(buf + 64) >> 2] = (stat.mtime.getTime() / 1e3) | 0;
-				HEAP32[(buf + 68) >> 2] = 0;
-				HEAP32[(buf + 72) >> 2] = (stat.ctime.getTime() / 1e3) | 0;
-				HEAP32[(buf + 76) >> 2] = 0;
+					(GROWABLE_HEAP_I32()[(buf + 40) >> 2] = tempI64[0]),
+					(GROWABLE_HEAP_I32()[(buf + 44) >> 2] = tempI64[1]);
+				GROWABLE_HEAP_I32()[(buf + 48) >> 2] = 4096;
+				GROWABLE_HEAP_I32()[(buf + 52) >> 2] = stat.blocks;
+				GROWABLE_HEAP_I32()[(buf + 56) >> 2] = (stat.atime.getTime() / 1e3) | 0;
+				GROWABLE_HEAP_I32()[(buf + 60) >> 2] = 0;
+				GROWABLE_HEAP_I32()[(buf + 64) >> 2] = (stat.mtime.getTime() / 1e3) | 0;
+				GROWABLE_HEAP_I32()[(buf + 68) >> 2] = 0;
+				GROWABLE_HEAP_I32()[(buf + 72) >> 2] = (stat.ctime.getTime() / 1e3) | 0;
+				GROWABLE_HEAP_I32()[(buf + 76) >> 2] = 0;
 				(tempI64 = [
 					stat.ino >>> 0,
 					((tempDouble = stat.ino),
@@ -3557,12 +3926,12 @@ var createPythonModule = (() => {
 							: ~~+Math.ceil((tempDouble - +(~~tempDouble >>> 0)) / 4294967296) >>> 0
 						: 0)
 				]),
-					(HEAP32[(buf + 80) >> 2] = tempI64[0]),
-					(HEAP32[(buf + 84) >> 2] = tempI64[1]);
+					(GROWABLE_HEAP_I32()[(buf + 80) >> 2] = tempI64[0]),
+					(GROWABLE_HEAP_I32()[(buf + 84) >> 2] = tempI64[1]);
 				return 0;
 			},
 			doMsync: function (addr, stream, len, flags, offset) {
-				var buffer = HEAPU8.slice(addr, addr + len);
+				var buffer = GROWABLE_HEAP_U8().slice(addr, addr + len);
 				FS.msync(stream, buffer, offset, len, flags);
 			},
 			doMknod: function (path, mode, dev) {
@@ -3583,9 +3952,9 @@ var createPythonModule = (() => {
 				if (bufsize <= 0) return -28;
 				var ret = FS.readlink(path);
 				var len = Math.min(bufsize, lengthBytesUTF8(ret));
-				var endChar = HEAP8[buf + len];
+				var endChar = GROWABLE_HEAP_I8()[buf + len];
 				stringToUTF8(ret, buf, bufsize + 1);
-				HEAP8[buf + len] = endChar;
+				GROWABLE_HEAP_I8()[buf + len] = endChar;
 				return len;
 			},
 			doAccess: function (path, amode) {
@@ -3609,10 +3978,10 @@ var createPythonModule = (() => {
 			doReadv: function (stream, iov, iovcnt, offset) {
 				var ret = 0;
 				for (var i = 0; i < iovcnt; i++) {
-					var ptr = HEAP32[iov >> 2];
-					var len = HEAP32[(iov + 4) >> 2];
+					var ptr = GROWABLE_HEAP_I32()[iov >> 2];
+					var len = GROWABLE_HEAP_I32()[(iov + 4) >> 2];
 					iov += 8;
-					var curr = FS.read(stream, HEAP8, ptr, len, offset);
+					var curr = FS.read(stream, GROWABLE_HEAP_I8(), ptr, len, offset);
 					if (curr < 0) return -1;
 					ret += curr;
 					if (curr < len) break;
@@ -3622,10 +3991,10 @@ var createPythonModule = (() => {
 			doWritev: function (stream, iov, iovcnt, offset) {
 				var ret = 0;
 				for (var i = 0; i < iovcnt; i++) {
-					var ptr = HEAP32[iov >> 2];
-					var len = HEAP32[(iov + 4) >> 2];
+					var ptr = GROWABLE_HEAP_I32()[iov >> 2];
+					var len = GROWABLE_HEAP_I32()[(iov + 4) >> 2];
 					iov += 8;
-					var curr = FS.write(stream, HEAP8, ptr, len, offset);
+					var curr = FS.write(stream, GROWABLE_HEAP_I8(), ptr, len, offset);
 					if (curr < 0) return -1;
 					ret += curr;
 				}
@@ -3634,7 +4003,7 @@ var createPythonModule = (() => {
 			varargs: undefined,
 			get: function () {
 				SYSCALLS.varargs += 4;
-				var ret = HEAP32[(SYSCALLS.varargs - 4) >> 2];
+				var ret = GROWABLE_HEAP_I32()[(SYSCALLS.varargs - 4) >> 2];
 				return ret;
 			},
 			getStr: function (ptr) {
@@ -3648,14 +4017,24 @@ var createPythonModule = (() => {
 			}
 		};
 		function ___syscall__newselect(nfds, readfds, writefds, exceptfds, timeout) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(
+					3,
+					1,
+					nfds,
+					readfds,
+					writefds,
+					exceptfds,
+					timeout
+				);
 			try {
 				var total = 0;
-				var srcReadLow = readfds ? HEAP32[readfds >> 2] : 0,
-					srcReadHigh = readfds ? HEAP32[(readfds + 4) >> 2] : 0;
-				var srcWriteLow = writefds ? HEAP32[writefds >> 2] : 0,
-					srcWriteHigh = writefds ? HEAP32[(writefds + 4) >> 2] : 0;
-				var srcExceptLow = exceptfds ? HEAP32[exceptfds >> 2] : 0,
-					srcExceptHigh = exceptfds ? HEAP32[(exceptfds + 4) >> 2] : 0;
+				var srcReadLow = readfds ? GROWABLE_HEAP_I32()[readfds >> 2] : 0,
+					srcReadHigh = readfds ? GROWABLE_HEAP_I32()[(readfds + 4) >> 2] : 0;
+				var srcWriteLow = writefds ? GROWABLE_HEAP_I32()[writefds >> 2] : 0,
+					srcWriteHigh = writefds ? GROWABLE_HEAP_I32()[(writefds + 4) >> 2] : 0;
+				var srcExceptLow = exceptfds ? GROWABLE_HEAP_I32()[exceptfds >> 2] : 0,
+					srcExceptHigh = exceptfds ? GROWABLE_HEAP_I32()[(exceptfds + 4) >> 2] : 0;
 				var dstReadLow = 0,
 					dstReadHigh = 0;
 				var dstWriteLow = 0,
@@ -3663,13 +4042,13 @@ var createPythonModule = (() => {
 				var dstExceptLow = 0,
 					dstExceptHigh = 0;
 				var allLow =
-					(readfds ? HEAP32[readfds >> 2] : 0) |
-					(writefds ? HEAP32[writefds >> 2] : 0) |
-					(exceptfds ? HEAP32[exceptfds >> 2] : 0);
+					(readfds ? GROWABLE_HEAP_I32()[readfds >> 2] : 0) |
+					(writefds ? GROWABLE_HEAP_I32()[writefds >> 2] : 0) |
+					(exceptfds ? GROWABLE_HEAP_I32()[exceptfds >> 2] : 0);
 				var allHigh =
-					(readfds ? HEAP32[(readfds + 4) >> 2] : 0) |
-					(writefds ? HEAP32[(writefds + 4) >> 2] : 0) |
-					(exceptfds ? HEAP32[(exceptfds + 4) >> 2] : 0);
+					(readfds ? GROWABLE_HEAP_I32()[(readfds + 4) >> 2] : 0) |
+					(writefds ? GROWABLE_HEAP_I32()[(writefds + 4) >> 2] : 0) |
+					(exceptfds ? GROWABLE_HEAP_I32()[(exceptfds + 4) >> 2] : 0);
 				var check = function (fd, low, high, val) {
 					return fd < 32 ? low & val : high & val;
 				};
@@ -3698,16 +4077,16 @@ var createPythonModule = (() => {
 					}
 				}
 				if (readfds) {
-					HEAP32[readfds >> 2] = dstReadLow;
-					HEAP32[(readfds + 4) >> 2] = dstReadHigh;
+					GROWABLE_HEAP_I32()[readfds >> 2] = dstReadLow;
+					GROWABLE_HEAP_I32()[(readfds + 4) >> 2] = dstReadHigh;
 				}
 				if (writefds) {
-					HEAP32[writefds >> 2] = dstWriteLow;
-					HEAP32[(writefds + 4) >> 2] = dstWriteHigh;
+					GROWABLE_HEAP_I32()[writefds >> 2] = dstWriteLow;
+					GROWABLE_HEAP_I32()[(writefds + 4) >> 2] = dstWriteHigh;
 				}
 				if (exceptfds) {
-					HEAP32[exceptfds >> 2] = dstExceptLow;
-					HEAP32[(exceptfds + 4) >> 2] = dstExceptHigh;
+					GROWABLE_HEAP_I32()[exceptfds >> 2] = dstExceptLow;
+					GROWABLE_HEAP_I32()[(exceptfds + 4) >> 2] = dstExceptHigh;
 				}
 				return total;
 			} catch (e) {
@@ -4012,7 +4391,7 @@ var createPythonModule = (() => {
 							if (sock.recv_queue.length) {
 								bytes = sock.recv_queue[0].data.length;
 							}
-							HEAP32[arg >> 2] = bytes;
+							GROWABLE_HEAP_I32()[arg >> 2] = bytes;
 							return 0;
 						default:
 							return 28;
@@ -4130,7 +4509,11 @@ var createPythonModule = (() => {
 						buffer = buffer.buffer;
 					}
 					var data;
-					data = buffer.slice(offset, offset + length);
+					if (buffer instanceof SharedArrayBuffer) {
+						data = new Uint8Array(new Uint8Array(buffer.slice(offset, offset + length))).buffer;
+					} else {
+						data = buffer.slice(offset, offset + length);
+					}
 					if (sock.type === 2) {
 						if (!dest || dest.socket.readyState !== dest.socket.OPEN) {
 							if (
@@ -4265,24 +4648,24 @@ var createPythonModule = (() => {
 					addr = inetPton4(addr);
 					zeroMemory(sa, 16);
 					if (addrlen) {
-						HEAP32[addrlen >> 2] = 16;
+						GROWABLE_HEAP_I32()[addrlen >> 2] = 16;
 					}
-					HEAP16[sa >> 1] = family;
-					HEAP32[(sa + 4) >> 2] = addr;
-					HEAP16[(sa + 2) >> 1] = _htons(port);
+					GROWABLE_HEAP_I16()[sa >> 1] = family;
+					GROWABLE_HEAP_I32()[(sa + 4) >> 2] = addr;
+					GROWABLE_HEAP_I16()[(sa + 2) >> 1] = _htons(port);
 					break;
 				case 10:
 					addr = inetPton6(addr);
 					zeroMemory(sa, 28);
 					if (addrlen) {
-						HEAP32[addrlen >> 2] = 28;
+						GROWABLE_HEAP_I32()[addrlen >> 2] = 28;
 					}
-					HEAP32[sa >> 2] = family;
-					HEAP32[(sa + 8) >> 2] = addr[0];
-					HEAP32[(sa + 12) >> 2] = addr[1];
-					HEAP32[(sa + 16) >> 2] = addr[2];
-					HEAP32[(sa + 20) >> 2] = addr[3];
-					HEAP16[(sa + 2) >> 1] = _htons(port);
+					GROWABLE_HEAP_I32()[sa >> 2] = family;
+					GROWABLE_HEAP_I32()[(sa + 8) >> 2] = addr[0];
+					GROWABLE_HEAP_I32()[(sa + 12) >> 2] = addr[1];
+					GROWABLE_HEAP_I32()[(sa + 16) >> 2] = addr[2];
+					GROWABLE_HEAP_I32()[(sa + 20) >> 2] = addr[3];
+					GROWABLE_HEAP_I16()[(sa + 2) >> 1] = _htons(port);
 					break;
 				default:
 					return 5;
@@ -4320,6 +4703,8 @@ var createPythonModule = (() => {
 			}
 		};
 		function ___syscall_accept4(fd, addr, addrlen, flags) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(4, 1, fd, addr, addrlen, flags);
 			try {
 				var sock = getSocketFromFD(fd);
 				var newsock = sock.sock_ops.accept(sock);
@@ -4419,15 +4804,15 @@ var createPythonModule = (() => {
 			return str;
 		}
 		function readSockaddr(sa, salen) {
-			var family = HEAP16[sa >> 1];
-			var port = _ntohs(HEAPU16[(sa + 2) >> 1]);
+			var family = GROWABLE_HEAP_I16()[sa >> 1];
+			var port = _ntohs(GROWABLE_HEAP_U16()[(sa + 2) >> 1]);
 			var addr;
 			switch (family) {
 				case 2:
 					if (salen !== 16) {
 						return { errno: 28 };
 					}
-					addr = HEAP32[(sa + 4) >> 2];
+					addr = GROWABLE_HEAP_I32()[(sa + 4) >> 2];
 					addr = inetNtop4(addr);
 					break;
 				case 10:
@@ -4435,10 +4820,10 @@ var createPythonModule = (() => {
 						return { errno: 28 };
 					}
 					addr = [
-						HEAP32[(sa + 8) >> 2],
-						HEAP32[(sa + 12) >> 2],
-						HEAP32[(sa + 16) >> 2],
-						HEAP32[(sa + 20) >> 2]
+						GROWABLE_HEAP_I32()[(sa + 8) >> 2],
+						GROWABLE_HEAP_I32()[(sa + 12) >> 2],
+						GROWABLE_HEAP_I32()[(sa + 16) >> 2],
+						GROWABLE_HEAP_I32()[(sa + 20) >> 2]
 					];
 					addr = inetNtop6(addr);
 					break;
@@ -4455,6 +4840,8 @@ var createPythonModule = (() => {
 			return info;
 		}
 		function ___syscall_bind(fd, addr, addrlen) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(5, 1, fd, addr, addrlen);
 			try {
 				var sock = getSocketFromFD(fd);
 				var info = getSocketAddress(addr, addrlen);
@@ -4466,6 +4853,7 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_chdir(path) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(6, 1, path);
 			try {
 				path = SYSCALLS.getStr(path);
 				FS.chdir(path);
@@ -4476,6 +4864,7 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_chmod(path, mode) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(7, 1, path, mode);
 			try {
 				path = SYSCALLS.getStr(path);
 				FS.chmod(path, mode);
@@ -4486,6 +4875,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_connect(fd, addr, addrlen) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(8, 1, fd, addr, addrlen);
 			try {
 				var sock = getSocketFromFD(fd);
 				var info = getSocketAddress(addr, addrlen);
@@ -4497,6 +4888,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_dup3(fd, suggestFD, flags) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(9, 1, fd, suggestFD, flags);
 			try {
 				var old = SYSCALLS.getStreamFromFD(fd);
 				if (old.fd === suggestFD) return -28;
@@ -4509,6 +4902,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_faccessat(dirfd, path, amode, flags) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(10, 1, dirfd, path, amode, flags);
 			try {
 				path = SYSCALLS.getStr(path);
 				path = SYSCALLS.calculateAt(dirfd, path);
@@ -4522,6 +4917,7 @@ var createPythonModule = (() => {
 			return 0;
 		}
 		function ___syscall_fchdir(fd) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(11, 1, fd);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				FS.chdir(stream.path);
@@ -4532,6 +4928,7 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_fchmod(fd, mode) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(12, 1, fd, mode);
 			try {
 				FS.fchmod(fd, mode);
 				return 0;
@@ -4541,6 +4938,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_fchmodat(dirfd, path, mode, varargs) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(13, 1, dirfd, path, mode, varargs);
 			SYSCALLS.varargs = varargs;
 			try {
 				path = SYSCALLS.getStr(path);
@@ -4553,6 +4952,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_fchown32(fd, owner, group) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(14, 1, fd, owner, group);
 			try {
 				FS.fchown(fd, owner, group);
 				return 0;
@@ -4562,6 +4963,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_fchownat(dirfd, path, owner, group, flags) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(15, 1, dirfd, path, owner, group, flags);
 			try {
 				path = SYSCALLS.getStr(path);
 				var nofollow = flags & 256;
@@ -4575,6 +4978,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_fcntl64(fd, cmd, varargs) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(16, 1, fd, cmd, varargs);
 			SYSCALLS.varargs = varargs;
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
@@ -4601,7 +5006,7 @@ var createPythonModule = (() => {
 					case 5: {
 						var arg = SYSCALLS.get();
 						var offset = 0;
-						HEAP16[(arg + offset) >> 1] = 2;
+						GROWABLE_HEAP_I16()[(arg + offset) >> 1] = 2;
 						return 0;
 					}
 					case 6:
@@ -4623,6 +5028,7 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_fdatasync(fd) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(17, 1, fd);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				return 0;
@@ -4632,6 +5038,7 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_fstat64(fd, buf) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(18, 1, fd, buf);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				return SYSCALLS.doStat(FS.stat, stream.path, buf);
@@ -4641,18 +5048,20 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_statfs64(path, size, buf) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(20, 1, path, size, buf);
 			try {
 				path = SYSCALLS.getStr(path);
-				HEAP32[(buf + 4) >> 2] = 4096;
-				HEAP32[(buf + 40) >> 2] = 4096;
-				HEAP32[(buf + 8) >> 2] = 1e6;
-				HEAP32[(buf + 12) >> 2] = 5e5;
-				HEAP32[(buf + 16) >> 2] = 5e5;
-				HEAP32[(buf + 20) >> 2] = FS.nextInode;
-				HEAP32[(buf + 24) >> 2] = 1e6;
-				HEAP32[(buf + 28) >> 2] = 42;
-				HEAP32[(buf + 44) >> 2] = 2;
-				HEAP32[(buf + 36) >> 2] = 255;
+				GROWABLE_HEAP_I32()[(buf + 4) >> 2] = 4096;
+				GROWABLE_HEAP_I32()[(buf + 40) >> 2] = 4096;
+				GROWABLE_HEAP_I32()[(buf + 8) >> 2] = 1e6;
+				GROWABLE_HEAP_I32()[(buf + 12) >> 2] = 5e5;
+				GROWABLE_HEAP_I32()[(buf + 16) >> 2] = 5e5;
+				GROWABLE_HEAP_I32()[(buf + 20) >> 2] = FS.nextInode;
+				GROWABLE_HEAP_I32()[(buf + 24) >> 2] = 1e6;
+				GROWABLE_HEAP_I32()[(buf + 28) >> 2] = 42;
+				GROWABLE_HEAP_I32()[(buf + 44) >> 2] = 2;
+				GROWABLE_HEAP_I32()[(buf + 36) >> 2] = 255;
 				return 0;
 			} catch (e) {
 				if (typeof FS == 'undefined' || !(e instanceof FS.ErrnoError)) throw e;
@@ -4660,6 +5069,7 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_fstatfs64(fd, size, buf) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(19, 1, fd, size, buf);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				return ___syscall_statfs64(0, size, buf);
@@ -4669,6 +5079,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_ftruncate64(fd, length_low, length_high) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(21, 1, fd, length_low, length_high);
 			try {
 				var length = length_high * 4294967296 + (length_low >>> 0);
 				FS.ftruncate(fd, length);
@@ -4679,6 +5091,7 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_getcwd(buf, size) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(22, 1, buf, size);
 			try {
 				if (size === 0) return -28;
 				var cwd = FS.cwd();
@@ -4692,6 +5105,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_getdents64(fd, dirp, count) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(23, 1, fd, dirp, count);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				if (!stream.getdents) {
@@ -4732,8 +5147,8 @@ var createPythonModule = (() => {
 								: ~~+Math.ceil((tempDouble - +(~~tempDouble >>> 0)) / 4294967296) >>> 0
 							: 0)
 					]),
-						(HEAP32[(dirp + pos) >> 2] = tempI64[0]),
-						(HEAP32[(dirp + pos + 4) >> 2] = tempI64[1]);
+						(GROWABLE_HEAP_I32()[(dirp + pos) >> 2] = tempI64[0]),
+						(GROWABLE_HEAP_I32()[(dirp + pos + 4) >> 2] = tempI64[1]);
 					(tempI64 = [
 						((idx + 1) * struct_size) >>> 0,
 						((tempDouble = (idx + 1) * struct_size),
@@ -4743,10 +5158,10 @@ var createPythonModule = (() => {
 								: ~~+Math.ceil((tempDouble - +(~~tempDouble >>> 0)) / 4294967296) >>> 0
 							: 0)
 					]),
-						(HEAP32[(dirp + pos + 8) >> 2] = tempI64[0]),
-						(HEAP32[(dirp + pos + 12) >> 2] = tempI64[1]);
-					HEAP16[(dirp + pos + 16) >> 1] = 280;
-					HEAP8[(dirp + pos + 18) >> 0] = type;
+						(GROWABLE_HEAP_I32()[(dirp + pos + 8) >> 2] = tempI64[0]),
+						(GROWABLE_HEAP_I32()[(dirp + pos + 12) >> 2] = tempI64[1]);
+					GROWABLE_HEAP_I16()[(dirp + pos + 16) >> 1] = 280;
+					GROWABLE_HEAP_I8()[(dirp + pos + 18) >> 0] = type;
 					stringToUTF8(name, dirp + pos + 19, 256);
 					pos += struct_size;
 					idx += 1;
@@ -4759,6 +5174,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_getpeername(fd, addr, addrlen) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(24, 1, fd, addr, addrlen);
 			try {
 				var sock = getSocketFromFD(fd);
 				if (!sock.daddr) {
@@ -4778,6 +5195,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_getsockname(fd, addr, addrlen) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(25, 1, fd, addr, addrlen);
 			try {
 				err('__syscall_getsockname ' + fd);
 				var sock = getSocketFromFD(fd);
@@ -4795,12 +5214,14 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_getsockopt(fd, level, optname, optval, optlen) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(26, 1, fd, level, optname, optval, optlen);
 			try {
 				var sock = getSocketFromFD(fd);
 				if (level === 1) {
 					if (optname === 4) {
-						HEAP32[optval >> 2] = sock.error;
-						HEAP32[optlen >> 2] = 4;
+						GROWABLE_HEAP_I32()[optval >> 2] = sock.error;
+						GROWABLE_HEAP_I32()[optlen >> 2] = 4;
 						sock.error = null;
 						return 0;
 					}
@@ -4812,6 +5233,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_ioctl(fd, op, varargs) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(27, 1, fd, op, varargs);
 			SYSCALLS.varargs = varargs;
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
@@ -4833,7 +5256,7 @@ var createPythonModule = (() => {
 					case 21519: {
 						if (!stream.tty) return -59;
 						var argp = SYSCALLS.get();
-						HEAP32[argp >> 2] = 0;
+						GROWABLE_HEAP_I32()[argp >> 2] = 0;
 						return 0;
 					}
 					case 21520: {
@@ -4861,6 +5284,7 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_listen(fd, backlog) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(28, 1, fd, backlog);
 			try {
 				var sock = getSocketFromFD(fd);
 				sock.sock_ops.listen(sock, backlog);
@@ -4871,6 +5295,7 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_lstat64(path, buf) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(29, 1, path, buf);
 			try {
 				path = SYSCALLS.getStr(path);
 				return SYSCALLS.doStat(FS.lstat, path, buf);
@@ -4880,6 +5305,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_mkdirat(dirfd, path, mode) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(30, 1, dirfd, path, mode);
 			try {
 				path = SYSCALLS.getStr(path);
 				path = SYSCALLS.calculateAt(dirfd, path);
@@ -4893,6 +5320,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_newfstatat(dirfd, path, buf, flags) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(31, 1, dirfd, path, buf, flags);
 			try {
 				path = SYSCALLS.getStr(path);
 				var nofollow = flags & 256;
@@ -4906,6 +5335,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_openat(dirfd, path, flags, varargs) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(32, 1, dirfd, path, flags, varargs);
 			SYSCALLS.varargs = varargs;
 			try {
 				path = SYSCALLS.getStr(path);
@@ -4983,7 +5414,11 @@ var createPythonModule = (() => {
 						var bucket = pipe.buckets[i];
 						currentLength += bucket.offset - bucket.roffset;
 					}
-					assert(buffer instanceof ArrayBuffer || ArrayBuffer.isView(buffer));
+					assert(
+						buffer instanceof ArrayBuffer ||
+							buffer instanceof SharedArrayBuffer ||
+							ArrayBuffer.isView(buffer)
+					);
 					var data = buffer.subarray(offset, offset + length);
 					if (length <= 0) {
 						return 0;
@@ -5025,7 +5460,11 @@ var createPythonModule = (() => {
 				},
 				write: function (stream, buffer, offset, length, position) {
 					var pipe = stream.node.pipe;
-					assert(buffer instanceof ArrayBuffer || ArrayBuffer.isView(buffer));
+					assert(
+						buffer instanceof ArrayBuffer ||
+							buffer instanceof SharedArrayBuffer ||
+							ArrayBuffer.isView(buffer)
+					);
 					var data = buffer.subarray(offset, offset + length);
 					var dataLen = data.byteLength;
 					if (dataLen <= 0) {
@@ -5092,13 +5531,14 @@ var createPythonModule = (() => {
 			}
 		};
 		function ___syscall_pipe(fdPtr) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(33, 1, fdPtr);
 			try {
 				if (fdPtr == 0) {
 					throw new FS.ErrnoError(21);
 				}
 				var res = PIPEFS.createPipe();
-				HEAP32[fdPtr >> 2] = res.readable_fd;
-				HEAP32[(fdPtr + 4) >> 2] = res.writable_fd;
+				GROWABLE_HEAP_I32()[fdPtr >> 2] = res.readable_fd;
+				GROWABLE_HEAP_I32()[(fdPtr + 4) >> 2] = res.writable_fd;
 				return 0;
 			} catch (e) {
 				if (typeof FS == 'undefined' || !(e instanceof FS.ErrnoError)) throw e;
@@ -5106,12 +5546,14 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_poll(fds, nfds, timeout) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(34, 1, fds, nfds, timeout);
 			try {
 				var nonzero = 0;
 				for (var i = 0; i < nfds; i++) {
 					var pollfd = fds + 8 * i;
-					var fd = HEAP32[pollfd >> 2];
-					var events = HEAP16[(pollfd + 4) >> 1];
+					var fd = GROWABLE_HEAP_I32()[pollfd >> 2];
+					var events = GROWABLE_HEAP_I16()[(pollfd + 4) >> 1];
 					var mask = 32;
 					var stream = FS.getStream(fd);
 					if (stream) {
@@ -5122,7 +5564,7 @@ var createPythonModule = (() => {
 					}
 					mask &= events | 8 | 16;
 					if (mask) nonzero++;
-					HEAP16[(pollfd + 6) >> 1] = mask;
+					GROWABLE_HEAP_I16()[(pollfd + 6) >> 1] = mask;
 				}
 				return nonzero;
 			} catch (e) {
@@ -5131,6 +5573,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_readlinkat(dirfd, path, buf, bufsize) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(35, 1, dirfd, path, buf, bufsize);
 			try {
 				path = SYSCALLS.getStr(path);
 				path = SYSCALLS.calculateAt(dirfd, path);
@@ -5141,6 +5585,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_recvfrom(fd, buf, len, flags, addr, addrlen) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(36, 1, fd, buf, len, flags, addr, addrlen);
 			try {
 				var sock = getSocketFromFD(fd);
 				var msg = sock.sock_ops.recvmsg(sock, len);
@@ -5154,7 +5600,7 @@ var createPythonModule = (() => {
 						addrlen
 					);
 				}
-				HEAPU8.set(msg.buffer, buf);
+				GROWABLE_HEAP_U8().set(msg.buffer, buf);
 				return msg.buffer.byteLength;
 			} catch (e) {
 				if (typeof FS == 'undefined' || !(e instanceof FS.ErrnoError)) throw e;
@@ -5162,31 +5608,33 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_recvmsg(fd, message, flags) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(37, 1, fd, message, flags);
 			try {
 				var sock = getSocketFromFD(fd);
-				var iov = HEAP32[(message + 8) >> 2];
-				var num = HEAP32[(message + 12) >> 2];
+				var iov = GROWABLE_HEAP_I32()[(message + 8) >> 2];
+				var num = GROWABLE_HEAP_I32()[(message + 12) >> 2];
 				var total = 0;
 				for (var i = 0; i < num; i++) {
-					total += HEAP32[(iov + (8 * i + 4)) >> 2];
+					total += GROWABLE_HEAP_I32()[(iov + (8 * i + 4)) >> 2];
 				}
 				var msg = sock.sock_ops.recvmsg(sock, total);
 				if (!msg) return 0;
-				var name = HEAP32[message >> 2];
+				var name = GROWABLE_HEAP_I32()[message >> 2];
 				if (name) {
 					var errno = writeSockaddr(name, sock.family, DNS.lookup_name(msg.addr), msg.port);
 				}
 				var bytesRead = 0;
 				var bytesRemaining = msg.buffer.byteLength;
 				for (var i = 0; bytesRemaining > 0 && i < num; i++) {
-					var iovbase = HEAP32[(iov + (8 * i + 0)) >> 2];
-					var iovlen = HEAP32[(iov + (8 * i + 4)) >> 2];
+					var iovbase = GROWABLE_HEAP_I32()[(iov + (8 * i + 0)) >> 2];
+					var iovlen = GROWABLE_HEAP_I32()[(iov + (8 * i + 4)) >> 2];
 					if (!iovlen) {
 						continue;
 					}
 					var length = Math.min(iovlen, bytesRemaining);
 					var buf = msg.buffer.subarray(bytesRead, bytesRead + length);
-					HEAPU8.set(buf, iovbase + bytesRead);
+					GROWABLE_HEAP_U8().set(buf, iovbase + bytesRead);
 					bytesRead += length;
 					bytesRemaining -= length;
 				}
@@ -5197,6 +5645,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_renameat(olddirfd, oldpath, newdirfd, newpath) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(38, 1, olddirfd, oldpath, newdirfd, newpath);
 			try {
 				oldpath = SYSCALLS.getStr(oldpath);
 				newpath = SYSCALLS.getStr(newpath);
@@ -5210,6 +5660,7 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_rmdir(path) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(39, 1, path);
 			try {
 				path = SYSCALLS.getStr(path);
 				FS.rmdir(path);
@@ -5220,13 +5671,15 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_sendmsg(fd, message, flags) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(40, 1, fd, message, flags);
 			try {
 				var sock = getSocketFromFD(fd);
-				var iov = HEAP32[(message + 8) >> 2];
-				var num = HEAP32[(message + 12) >> 2];
+				var iov = GROWABLE_HEAP_I32()[(message + 8) >> 2];
+				var num = GROWABLE_HEAP_I32()[(message + 12) >> 2];
 				var addr, port;
-				var name = HEAP32[message >> 2];
-				var namelen = HEAP32[(message + 4) >> 2];
+				var name = GROWABLE_HEAP_I32()[message >> 2];
+				var namelen = GROWABLE_HEAP_I32()[(message + 4) >> 2];
 				if (name) {
 					var info = readSockaddr(name, namelen);
 					if (info.errno) return -info.errno;
@@ -5235,15 +5688,15 @@ var createPythonModule = (() => {
 				}
 				var total = 0;
 				for (var i = 0; i < num; i++) {
-					total += HEAP32[(iov + (8 * i + 4)) >> 2];
+					total += GROWABLE_HEAP_I32()[(iov + (8 * i + 4)) >> 2];
 				}
 				var view = new Uint8Array(total);
 				var offset = 0;
 				for (var i = 0; i < num; i++) {
-					var iovbase = HEAP32[(iov + (8 * i + 0)) >> 2];
-					var iovlen = HEAP32[(iov + (8 * i + 4)) >> 2];
+					var iovbase = GROWABLE_HEAP_I32()[(iov + (8 * i + 0)) >> 2];
+					var iovlen = GROWABLE_HEAP_I32()[(iov + (8 * i + 4)) >> 2];
 					for (var j = 0; j < iovlen; j++) {
-						view[offset++] = HEAP8[(iovbase + j) >> 0];
+						view[offset++] = GROWABLE_HEAP_I8()[(iovbase + j) >> 0];
 					}
 				}
 				return sock.sock_ops.sendmsg(sock, view, 0, total, addr, port);
@@ -5253,13 +5706,31 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_sendto(fd, message, length, flags, addr, addr_len) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(
+					41,
+					1,
+					fd,
+					message,
+					length,
+					flags,
+					addr,
+					addr_len
+				);
 			try {
 				var sock = getSocketFromFD(fd);
 				var dest = getSocketAddress(addr, addr_len, true);
 				if (!dest) {
-					return FS.write(sock.stream, HEAP8, message, length);
+					return FS.write(sock.stream, GROWABLE_HEAP_I8(), message, length);
 				} else {
-					return sock.sock_ops.sendmsg(sock, HEAP8, message, length, dest.addr, dest.port);
+					return sock.sock_ops.sendmsg(
+						sock,
+						GROWABLE_HEAP_I8(),
+						message,
+						length,
+						dest.addr,
+						dest.port
+					);
 				}
 			} catch (e) {
 				if (typeof FS == 'undefined' || !(e instanceof FS.ErrnoError)) throw e;
@@ -5267,6 +5738,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_socket(domain, type, protocol) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(42, 1, domain, type, protocol);
 			try {
 				var sock = SOCKFS.createSocket(domain, type, protocol);
 				return sock.stream.fd;
@@ -5276,6 +5749,7 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_stat64(path, buf) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(43, 1, path, buf);
 			try {
 				path = SYSCALLS.getStr(path);
 				return SYSCALLS.doStat(FS.stat, path, buf);
@@ -5285,6 +5759,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_symlink(target, linkpath) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(44, 1, target, linkpath);
 			try {
 				target = SYSCALLS.getStr(target);
 				linkpath = SYSCALLS.getStr(linkpath);
@@ -5296,6 +5772,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_truncate64(path, length_low, length_high) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(45, 1, path, length_low, length_high);
 			try {
 				var length = length_high * 4294967296 + (length_low >>> 0);
 				path = SYSCALLS.getStr(path);
@@ -5307,6 +5785,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_unlinkat(dirfd, path, flags) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(46, 1, dirfd, path, flags);
 			try {
 				path = SYSCALLS.getStr(path);
 				path = SYSCALLS.calculateAt(dirfd, path);
@@ -5324,6 +5804,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function ___syscall_utimensat(dirfd, path, times, flags) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(47, 1, dirfd, path, times, flags);
 			try {
 				path = SYSCALLS.getStr(path);
 				path = SYSCALLS.calculateAt(dirfd, path, true);
@@ -5331,12 +5813,12 @@ var createPythonModule = (() => {
 					var atime = Date.now();
 					var mtime = atime;
 				} else {
-					var seconds = HEAP32[times >> 2];
-					var nanoseconds = HEAP32[(times + 4) >> 2];
+					var seconds = GROWABLE_HEAP_I32()[times >> 2];
+					var nanoseconds = GROWABLE_HEAP_I32()[(times + 4) >> 2];
 					atime = seconds * 1e3 + nanoseconds / (1e3 * 1e3);
 					times += 8;
-					seconds = HEAP32[times >> 2];
-					nanoseconds = HEAP32[(times + 4) >> 2];
+					seconds = GROWABLE_HEAP_I32()[times >> 2];
+					nanoseconds = GROWABLE_HEAP_I32()[(times + 4) >> 2];
 					mtime = seconds * 1e3 + nanoseconds / (1e3 * 1e3);
 				}
 				FS.utime(path, atime, mtime);
@@ -5349,61 +5831,91 @@ var createPythonModule = (() => {
 		function __emscripten_date_now() {
 			return Date.now();
 		}
+		function __emscripten_default_pthread_stack_size() {
+			return 2097152;
+		}
 		var nowIsMonotonic = true;
 		function __emscripten_get_now_is_monotonic() {
 			return nowIsMonotonic;
 		}
+		function executeNotifiedProxyingQueue(queue) {
+			try {
+				if (_pthread_self()) {
+					_emscripten_proxy_execute_queue(queue);
+				}
+			} finally {
+				Atomics.sub(GROWABLE_HEAP_I32(), queue >> 2, 1);
+			}
+		}
+		function __emscripten_notify_proxying_queue(targetThreadId, currThreadId, mainThreadId, queue) {
+			if (targetThreadId == currThreadId) {
+				setTimeout(() => executeNotifiedProxyingQueue(queue));
+			} else if (ENVIRONMENT_IS_PTHREAD) {
+				postMessage({ targetThread: targetThreadId, cmd: 'processProxyingQueue', queue: queue });
+			} else {
+				var pthread = PThread.pthreads[targetThreadId];
+				var worker = pthread && pthread.worker;
+				if (!worker) {
+					return;
+				}
+				worker.postMessage({ cmd: 'processProxyingQueue', queue: queue });
+			}
+			return 1;
+		}
+		function __emscripten_set_offscreencanvas_size(target, width, height) {
+			return -1;
+		}
 		function __gmtime_js(time, tmPtr) {
-			var date = new Date(HEAP32[time >> 2] * 1e3);
-			HEAP32[tmPtr >> 2] = date.getUTCSeconds();
-			HEAP32[(tmPtr + 4) >> 2] = date.getUTCMinutes();
-			HEAP32[(tmPtr + 8) >> 2] = date.getUTCHours();
-			HEAP32[(tmPtr + 12) >> 2] = date.getUTCDate();
-			HEAP32[(tmPtr + 16) >> 2] = date.getUTCMonth();
-			HEAP32[(tmPtr + 20) >> 2] = date.getUTCFullYear() - 1900;
-			HEAP32[(tmPtr + 24) >> 2] = date.getUTCDay();
+			var date = new Date(GROWABLE_HEAP_I32()[time >> 2] * 1e3);
+			GROWABLE_HEAP_I32()[tmPtr >> 2] = date.getUTCSeconds();
+			GROWABLE_HEAP_I32()[(tmPtr + 4) >> 2] = date.getUTCMinutes();
+			GROWABLE_HEAP_I32()[(tmPtr + 8) >> 2] = date.getUTCHours();
+			GROWABLE_HEAP_I32()[(tmPtr + 12) >> 2] = date.getUTCDate();
+			GROWABLE_HEAP_I32()[(tmPtr + 16) >> 2] = date.getUTCMonth();
+			GROWABLE_HEAP_I32()[(tmPtr + 20) >> 2] = date.getUTCFullYear() - 1900;
+			GROWABLE_HEAP_I32()[(tmPtr + 24) >> 2] = date.getUTCDay();
 			var start = Date.UTC(date.getUTCFullYear(), 0, 1, 0, 0, 0, 0);
 			var yday = ((date.getTime() - start) / (1e3 * 60 * 60 * 24)) | 0;
-			HEAP32[(tmPtr + 28) >> 2] = yday;
+			GROWABLE_HEAP_I32()[(tmPtr + 28) >> 2] = yday;
 		}
 		function __localtime_js(time, tmPtr) {
-			var date = new Date(HEAP32[time >> 2] * 1e3);
-			HEAP32[tmPtr >> 2] = date.getSeconds();
-			HEAP32[(tmPtr + 4) >> 2] = date.getMinutes();
-			HEAP32[(tmPtr + 8) >> 2] = date.getHours();
-			HEAP32[(tmPtr + 12) >> 2] = date.getDate();
-			HEAP32[(tmPtr + 16) >> 2] = date.getMonth();
-			HEAP32[(tmPtr + 20) >> 2] = date.getFullYear() - 1900;
-			HEAP32[(tmPtr + 24) >> 2] = date.getDay();
+			var date = new Date(GROWABLE_HEAP_I32()[time >> 2] * 1e3);
+			GROWABLE_HEAP_I32()[tmPtr >> 2] = date.getSeconds();
+			GROWABLE_HEAP_I32()[(tmPtr + 4) >> 2] = date.getMinutes();
+			GROWABLE_HEAP_I32()[(tmPtr + 8) >> 2] = date.getHours();
+			GROWABLE_HEAP_I32()[(tmPtr + 12) >> 2] = date.getDate();
+			GROWABLE_HEAP_I32()[(tmPtr + 16) >> 2] = date.getMonth();
+			GROWABLE_HEAP_I32()[(tmPtr + 20) >> 2] = date.getFullYear() - 1900;
+			GROWABLE_HEAP_I32()[(tmPtr + 24) >> 2] = date.getDay();
 			var start = new Date(date.getFullYear(), 0, 1);
 			var yday = ((date.getTime() - start.getTime()) / (1e3 * 60 * 60 * 24)) | 0;
-			HEAP32[(tmPtr + 28) >> 2] = yday;
-			HEAP32[(tmPtr + 36) >> 2] = -(date.getTimezoneOffset() * 60);
+			GROWABLE_HEAP_I32()[(tmPtr + 28) >> 2] = yday;
+			GROWABLE_HEAP_I32()[(tmPtr + 36) >> 2] = -(date.getTimezoneOffset() * 60);
 			var summerOffset = new Date(date.getFullYear(), 6, 1).getTimezoneOffset();
 			var winterOffset = start.getTimezoneOffset();
 			var dst =
 				(summerOffset != winterOffset &&
 					date.getTimezoneOffset() == Math.min(winterOffset, summerOffset)) | 0;
-			HEAP32[(tmPtr + 32) >> 2] = dst;
+			GROWABLE_HEAP_I32()[(tmPtr + 32) >> 2] = dst;
 		}
 		function __mktime_js(tmPtr) {
 			var date = new Date(
-				HEAP32[(tmPtr + 20) >> 2] + 1900,
-				HEAP32[(tmPtr + 16) >> 2],
-				HEAP32[(tmPtr + 12) >> 2],
-				HEAP32[(tmPtr + 8) >> 2],
-				HEAP32[(tmPtr + 4) >> 2],
-				HEAP32[tmPtr >> 2],
+				GROWABLE_HEAP_I32()[(tmPtr + 20) >> 2] + 1900,
+				GROWABLE_HEAP_I32()[(tmPtr + 16) >> 2],
+				GROWABLE_HEAP_I32()[(tmPtr + 12) >> 2],
+				GROWABLE_HEAP_I32()[(tmPtr + 8) >> 2],
+				GROWABLE_HEAP_I32()[(tmPtr + 4) >> 2],
+				GROWABLE_HEAP_I32()[tmPtr >> 2],
 				0
 			);
-			var dst = HEAP32[(tmPtr + 32) >> 2];
+			var dst = GROWABLE_HEAP_I32()[(tmPtr + 32) >> 2];
 			var guessedOffset = date.getTimezoneOffset();
 			var start = new Date(date.getFullYear(), 0, 1);
 			var summerOffset = new Date(date.getFullYear(), 6, 1).getTimezoneOffset();
 			var winterOffset = start.getTimezoneOffset();
 			var dstOffset = Math.min(winterOffset, summerOffset);
 			if (dst < 0) {
-				HEAP32[(tmPtr + 32) >> 2] = Number(
+				GROWABLE_HEAP_I32()[(tmPtr + 32) >> 2] = Number(
 					summerOffset != winterOffset && dstOffset == guessedOffset
 				);
 			} else if (dst > 0 != (dstOffset == guessedOffset)) {
@@ -5411,23 +5923,36 @@ var createPythonModule = (() => {
 				var trueOffset = dst > 0 ? dstOffset : nonDstOffset;
 				date.setTime(date.getTime() + (trueOffset - guessedOffset) * 6e4);
 			}
-			HEAP32[(tmPtr + 24) >> 2] = date.getDay();
+			GROWABLE_HEAP_I32()[(tmPtr + 24) >> 2] = date.getDay();
 			var yday = ((date.getTime() - start.getTime()) / (1e3 * 60 * 60 * 24)) | 0;
-			HEAP32[(tmPtr + 28) >> 2] = yday;
-			HEAP32[tmPtr >> 2] = date.getSeconds();
-			HEAP32[(tmPtr + 4) >> 2] = date.getMinutes();
-			HEAP32[(tmPtr + 8) >> 2] = date.getHours();
-			HEAP32[(tmPtr + 12) >> 2] = date.getDate();
-			HEAP32[(tmPtr + 16) >> 2] = date.getMonth();
+			GROWABLE_HEAP_I32()[(tmPtr + 28) >> 2] = yday;
+			GROWABLE_HEAP_I32()[tmPtr >> 2] = date.getSeconds();
+			GROWABLE_HEAP_I32()[(tmPtr + 4) >> 2] = date.getMinutes();
+			GROWABLE_HEAP_I32()[(tmPtr + 8) >> 2] = date.getHours();
+			GROWABLE_HEAP_I32()[(tmPtr + 12) >> 2] = date.getDate();
+			GROWABLE_HEAP_I32()[(tmPtr + 16) >> 2] = date.getMonth();
 			return (date.getTime() / 1e3) | 0;
 		}
 		function __mmap_js(addr, len, prot, flags, fd, off, allocated, builtin) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(
+					48,
+					1,
+					addr,
+					len,
+					prot,
+					flags,
+					fd,
+					off,
+					allocated,
+					builtin
+				);
 			try {
 				var info = FS.getStream(fd);
 				if (!info) return -8;
 				var res = FS.mmap(info, addr, len, off, prot, flags);
 				var ptr = res.ptr;
-				HEAP32[allocated >> 2] = res.allocated;
+				GROWABLE_HEAP_I32()[allocated >> 2] = res.allocated;
 				return ptr;
 			} catch (e) {
 				if (typeof FS == 'undefined' || !(e instanceof FS.ErrnoError)) throw e;
@@ -5435,6 +5960,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function __msync_js(addr, len, flags, fd) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(49, 1, addr, len, flags, fd);
 			try {
 				SYSCALLS.doMsync(addr, FS.getStream(fd), len, flags, 0);
 				return 0;
@@ -5444,6 +5971,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function __munmap_js(addr, len, prot, flags, fd, offset) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(50, 1, addr, len, prot, flags, fd, offset);
 			try {
 				var stream = FS.getStream(fd);
 				if (stream) {
@@ -5458,14 +5987,16 @@ var createPythonModule = (() => {
 			}
 		}
 		function _tzset_impl(timezone, daylight, tzname) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(51, 1, timezone, daylight, tzname);
 			var currentYear = new Date().getFullYear();
 			var winter = new Date(currentYear, 0, 1);
 			var summer = new Date(currentYear, 6, 1);
 			var winterOffset = winter.getTimezoneOffset();
 			var summerOffset = summer.getTimezoneOffset();
 			var stdTimezoneOffset = Math.max(winterOffset, summerOffset);
-			HEAP32[timezone >> 2] = stdTimezoneOffset * 60;
-			HEAP32[daylight >> 2] = Number(winterOffset != summerOffset);
+			GROWABLE_HEAP_I32()[timezone >> 2] = stdTimezoneOffset * 60;
+			GROWABLE_HEAP_I32()[daylight >> 2] = Number(winterOffset != summerOffset);
 			function extractZone(date) {
 				var match = date.toTimeString().match(/\(([A-Za-z ]+)\)$/);
 				return match ? match[1] : 'GMT';
@@ -5475,11 +6006,11 @@ var createPythonModule = (() => {
 			var winterNamePtr = allocateUTF8(winterName);
 			var summerNamePtr = allocateUTF8(summerName);
 			if (summerOffset < winterOffset) {
-				HEAP32[tzname >> 2] = winterNamePtr;
-				HEAP32[(tzname + 4) >> 2] = summerNamePtr;
+				GROWABLE_HEAP_I32()[tzname >> 2] = winterNamePtr;
+				GROWABLE_HEAP_I32()[(tzname + 4) >> 2] = summerNamePtr;
 			} else {
-				HEAP32[tzname >> 2] = summerNamePtr;
-				HEAP32[(tzname + 4) >> 2] = winterNamePtr;
+				GROWABLE_HEAP_I32()[tzname >> 2] = summerNamePtr;
+				GROWABLE_HEAP_I32()[(tzname + 4) >> 2] = winterNamePtr;
 			}
 		}
 		function __tzset_js(timezone, daylight, tzname) {
@@ -5490,16 +6021,52 @@ var createPythonModule = (() => {
 		function _abort() {
 			abort('');
 		}
+		function _emscripten_check_blocking_allowed() {
+			if (ENVIRONMENT_IS_WORKER) return;
+			warnOnce(
+				'Blocking on the main thread is very dangerous, see https://emscripten.org/docs/porting/pthreads.html#blocking-on-the-main-browser-thread'
+			);
+		}
 		function _emscripten_get_heap_max() {
 			return 2147483648;
 		}
 		var _emscripten_get_now;
-		_emscripten_get_now = () => performance.now();
+		if (ENVIRONMENT_IS_PTHREAD) {
+			_emscripten_get_now = () => performance.now() - Module['__performance_now_clock_drift'];
+		} else _emscripten_get_now = () => performance.now();
 		function _emscripten_get_now_res() {
 			return 1e3;
 		}
 		function _emscripten_memcpy_big(dest, src, num) {
-			HEAPU8.copyWithin(dest, src, src + num);
+			GROWABLE_HEAP_U8().copyWithin(dest, src, src + num);
+		}
+		function _emscripten_num_logical_cores() {
+			return navigator['hardwareConcurrency'];
+		}
+		function _emscripten_proxy_to_main_thread_js(index, sync) {
+			var numCallArgs = arguments.length - 2;
+			var outerArgs = arguments;
+			return withStackSave(function () {
+				var serializedNumCallArgs = numCallArgs;
+				var args = stackAlloc(serializedNumCallArgs * 8);
+				var b = args >> 3;
+				for (var i = 0; i < numCallArgs; i++) {
+					var arg = outerArgs[2 + i];
+					GROWABLE_HEAP_F64()[b + i] = arg;
+				}
+				return _emscripten_run_in_main_runtime_thread_js(index, serializedNumCallArgs, args, sync);
+			});
+		}
+		var _emscripten_receive_on_main_thread_js_callArgs = [];
+		function _emscripten_receive_on_main_thread_js(index, numCallArgs, args) {
+			_emscripten_receive_on_main_thread_js_callArgs.length = numCallArgs;
+			var b = args >> 3;
+			for (var i = 0; i < numCallArgs; i++) {
+				_emscripten_receive_on_main_thread_js_callArgs[i] = GROWABLE_HEAP_F64()[b + i];
+			}
+			var isEmAsmConst = index < 0;
+			var func = !isEmAsmConst ? proxiedFunctionTable[index] : ASM_CONSTS[-index - 1];
+			return func.apply(null, _emscripten_receive_on_main_thread_js_callArgs);
 		}
 		function emscripten_realloc_buffer(size) {
 			try {
@@ -5509,8 +6076,11 @@ var createPythonModule = (() => {
 			} catch (e) {}
 		}
 		function _emscripten_resize_heap(requestedSize) {
-			var oldSize = HEAPU8.length;
+			var oldSize = GROWABLE_HEAP_U8().length;
 			requestedSize = requestedSize >>> 0;
+			if (requestedSize <= oldSize) {
+				return false;
+			}
 			var maxHeapSize = _emscripten_get_heap_max();
 			if (requestedSize > maxHeapSize) {
 				return false;
@@ -5529,6 +6099,9 @@ var createPythonModule = (() => {
 				}
 			}
 			return false;
+		}
+		function _emscripten_unwind_to_js_event_loop() {
+			throw 'unwind';
 		}
 		var ENV = {};
 		function getExecutableName() {
@@ -5563,29 +6136,31 @@ var createPythonModule = (() => {
 			return getEnvStrings.strings;
 		}
 		function _environ_get(__environ, environ_buf) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(52, 1, __environ, environ_buf);
 			var bufSize = 0;
 			getEnvStrings().forEach(function (string, i) {
 				var ptr = environ_buf + bufSize;
-				HEAP32[(__environ + i * 4) >> 2] = ptr;
+				GROWABLE_HEAP_I32()[(__environ + i * 4) >> 2] = ptr;
 				writeAsciiToMemory(string, ptr);
 				bufSize += string.length + 1;
 			});
 			return 0;
 		}
 		function _environ_sizes_get(penviron_count, penviron_buf_size) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(53, 1, penviron_count, penviron_buf_size);
 			var strings = getEnvStrings();
-			HEAP32[penviron_count >> 2] = strings.length;
+			GROWABLE_HEAP_I32()[penviron_count >> 2] = strings.length;
 			var bufSize = 0;
 			strings.forEach(function (string) {
 				bufSize += string.length + 1;
 			});
-			HEAP32[penviron_buf_size >> 2] = bufSize;
+			GROWABLE_HEAP_I32()[penviron_buf_size >> 2] = bufSize;
 			return 0;
 		}
-		function _exit(status) {
-			exit(status);
-		}
 		function _fd_close(fd) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(54, 1, fd);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				FS.close(stream);
@@ -5596,10 +6171,11 @@ var createPythonModule = (() => {
 			}
 		}
 		function _fd_fdstat_get(fd, pbuf) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(55, 1, fd, pbuf);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				var type = stream.tty ? 2 : FS.isDir(stream.mode) ? 3 : FS.isLink(stream.mode) ? 7 : 4;
-				HEAP8[pbuf >> 0] = type;
+				GROWABLE_HEAP_I8()[pbuf >> 0] = type;
 				return 0;
 			} catch (e) {
 				if (typeof FS == 'undefined' || !(e instanceof FS.ErrnoError)) throw e;
@@ -5607,10 +6183,21 @@ var createPythonModule = (() => {
 			}
 		}
 		function _fd_pread(fd, iov, iovcnt, offset_low, offset_high, pnum) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(
+					56,
+					1,
+					fd,
+					iov,
+					iovcnt,
+					offset_low,
+					offset_high,
+					pnum
+				);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				var num = SYSCALLS.doReadv(stream, iov, iovcnt, offset_low);
-				HEAP32[pnum >> 2] = num;
+				GROWABLE_HEAP_I32()[pnum >> 2] = num;
 				return 0;
 			} catch (e) {
 				if (typeof FS == 'undefined' || !(e instanceof FS.ErrnoError)) throw e;
@@ -5618,10 +6205,21 @@ var createPythonModule = (() => {
 			}
 		}
 		function _fd_pwrite(fd, iov, iovcnt, offset_low, offset_high, pnum) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(
+					57,
+					1,
+					fd,
+					iov,
+					iovcnt,
+					offset_low,
+					offset_high,
+					pnum
+				);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				var num = SYSCALLS.doWritev(stream, iov, iovcnt, offset_low);
-				HEAP32[pnum >> 2] = num;
+				GROWABLE_HEAP_I32()[pnum >> 2] = num;
 				return 0;
 			} catch (e) {
 				if (typeof FS == 'undefined' || !(e instanceof FS.ErrnoError)) throw e;
@@ -5629,10 +6227,12 @@ var createPythonModule = (() => {
 			}
 		}
 		function _fd_read(fd, iov, iovcnt, pnum) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(58, 1, fd, iov, iovcnt, pnum);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				var num = SYSCALLS.doReadv(stream, iov, iovcnt);
-				HEAP32[pnum >> 2] = num;
+				GROWABLE_HEAP_I32()[pnum >> 2] = num;
 				return 0;
 			} catch (e) {
 				if (typeof FS == 'undefined' || !(e instanceof FS.ErrnoError)) throw e;
@@ -5640,6 +6240,16 @@ var createPythonModule = (() => {
 			}
 		}
 		function _fd_seek(fd, offset_low, offset_high, whence, newOffset) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(
+					59,
+					1,
+					fd,
+					offset_low,
+					offset_high,
+					whence,
+					newOffset
+				);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				var HIGH_OFFSET = 4294967296;
@@ -5658,8 +6268,8 @@ var createPythonModule = (() => {
 							: ~~+Math.ceil((tempDouble - +(~~tempDouble >>> 0)) / 4294967296) >>> 0
 						: 0)
 				]),
-					(HEAP32[newOffset >> 2] = tempI64[0]),
-					(HEAP32[(newOffset + 4) >> 2] = tempI64[1]);
+					(GROWABLE_HEAP_I32()[newOffset >> 2] = tempI64[0]),
+					(GROWABLE_HEAP_I32()[(newOffset + 4) >> 2] = tempI64[1]);
 				if (stream.getdents && offset === 0 && whence === 0) stream.getdents = null;
 				return 0;
 			} catch (e) {
@@ -5668,6 +6278,7 @@ var createPythonModule = (() => {
 			}
 		}
 		function _fd_sync(fd) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(60, 1, fd);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				if (stream.stream_ops && stream.stream_ops.fsync) {
@@ -5680,10 +6291,12 @@ var createPythonModule = (() => {
 			}
 		}
 		function _fd_write(fd, iov, iovcnt, pnum) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(61, 1, fd, iov, iovcnt, pnum);
 			try {
 				var stream = SYSCALLS.getStreamFromFD(fd);
 				var num = SYSCALLS.doWritev(stream, iov, iovcnt);
-				HEAP32[pnum >> 2] = num;
+				GROWABLE_HEAP_I32()[pnum >> 2] = num;
 				return 0;
 			} catch (e) {
 				if (typeof FS == 'undefined' || !(e instanceof FS.ErrnoError)) throw e;
@@ -5691,6 +6304,8 @@ var createPythonModule = (() => {
 			}
 		}
 		function _getaddrinfo(node, service, hint, out) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(62, 1, node, service, hint, out);
 			var addr = 0;
 			var port = 0;
 			var flags = 0;
@@ -5707,24 +6322,24 @@ var createPythonModule = (() => {
 				errno = writeSockaddr(sa, family, addr, port);
 				assert(!errno);
 				ai = _malloc(32);
-				HEAP32[(ai + 4) >> 2] = family;
-				HEAP32[(ai + 8) >> 2] = type;
-				HEAP32[(ai + 12) >> 2] = proto;
-				HEAP32[(ai + 24) >> 2] = canon;
-				HEAP32[(ai + 20) >> 2] = sa;
+				GROWABLE_HEAP_I32()[(ai + 4) >> 2] = family;
+				GROWABLE_HEAP_I32()[(ai + 8) >> 2] = type;
+				GROWABLE_HEAP_I32()[(ai + 12) >> 2] = proto;
+				GROWABLE_HEAP_I32()[(ai + 24) >> 2] = canon;
+				GROWABLE_HEAP_I32()[(ai + 20) >> 2] = sa;
 				if (family === 10) {
-					HEAP32[(ai + 16) >> 2] = 28;
+					GROWABLE_HEAP_I32()[(ai + 16) >> 2] = 28;
 				} else {
-					HEAP32[(ai + 16) >> 2] = 16;
+					GROWABLE_HEAP_I32()[(ai + 16) >> 2] = 16;
 				}
-				HEAP32[(ai + 28) >> 2] = 0;
+				GROWABLE_HEAP_I32()[(ai + 28) >> 2] = 0;
 				return ai;
 			}
 			if (hint) {
-				flags = HEAP32[hint >> 2];
-				family = HEAP32[(hint + 4) >> 2];
-				type = HEAP32[(hint + 8) >> 2];
-				proto = HEAP32[(hint + 12) >> 2];
+				flags = GROWABLE_HEAP_I32()[hint >> 2];
+				family = GROWABLE_HEAP_I32()[(hint + 4) >> 2];
+				type = GROWABLE_HEAP_I32()[(hint + 8) >> 2];
+				proto = GROWABLE_HEAP_I32()[(hint + 12) >> 2];
 			}
 			if (type && !proto) {
 				proto = type === 2 ? 17 : 6;
@@ -5744,7 +6359,7 @@ var createPythonModule = (() => {
 			if (flags & ~(1 | 2 | 4 | 1024 | 8 | 16 | 32)) {
 				return -1;
 			}
-			if (hint !== 0 && HEAP32[hint >> 2] & 2 && !node) {
+			if (hint !== 0 && GROWABLE_HEAP_I32()[hint >> 2] & 2 && !node) {
 				return -1;
 			}
 			if (flags & 32) {
@@ -5778,7 +6393,7 @@ var createPythonModule = (() => {
 					}
 				}
 				ai = allocaddrinfo(family, type, proto, null, addr, port);
-				HEAP32[out >> 2] = ai;
+				GROWABLE_HEAP_I32()[out >> 2] = ai;
 				return 0;
 			}
 			node = UTF8ToString(node);
@@ -5804,7 +6419,7 @@ var createPythonModule = (() => {
 			}
 			if (addr != null) {
 				ai = allocaddrinfo(family, type, proto, node, addr, port);
-				HEAP32[out >> 2] = ai;
+				GROWABLE_HEAP_I32()[out >> 2] = ai;
 				return 0;
 			}
 			if (flags & 4) {
@@ -5818,7 +6433,7 @@ var createPythonModule = (() => {
 				addr = [0, 0, _htonl(65535), addr];
 			}
 			ai = allocaddrinfo(family, type, proto, null, addr, port);
-			HEAP32[out >> 2] = ai;
+			GROWABLE_HEAP_I32()[out >> 2] = ai;
 			return 0;
 		}
 		function _getentropy(buffer, size) {
@@ -5826,7 +6441,7 @@ var createPythonModule = (() => {
 				_getentropy.randomDevice = getRandomDevice();
 			}
 			for (var i = 0; i < size; i++) {
-				HEAP8[(buffer + i) >> 0] = _getentropy.randomDevice();
+				GROWABLE_HEAP_I8()[(buffer + i) >> 0] = _getentropy.randomDevice();
 			}
 			return 0;
 		}
@@ -5834,26 +6449,28 @@ var createPythonModule = (() => {
 			var ret = _malloc(20);
 			var nameBuf = _malloc(name.length + 1);
 			stringToUTF8(name, nameBuf, name.length + 1);
-			HEAP32[ret >> 2] = nameBuf;
+			GROWABLE_HEAP_I32()[ret >> 2] = nameBuf;
 			var aliasesBuf = _malloc(4);
-			HEAP32[aliasesBuf >> 2] = 0;
-			HEAP32[(ret + 4) >> 2] = aliasesBuf;
+			GROWABLE_HEAP_I32()[aliasesBuf >> 2] = 0;
+			GROWABLE_HEAP_I32()[(ret + 4) >> 2] = aliasesBuf;
 			var afinet = 2;
-			HEAP32[(ret + 8) >> 2] = afinet;
-			HEAP32[(ret + 12) >> 2] = 4;
+			GROWABLE_HEAP_I32()[(ret + 8) >> 2] = afinet;
+			GROWABLE_HEAP_I32()[(ret + 12) >> 2] = 4;
 			var addrListBuf = _malloc(12);
-			HEAP32[addrListBuf >> 2] = addrListBuf + 8;
-			HEAP32[(addrListBuf + 4) >> 2] = 0;
-			HEAP32[(addrListBuf + 8) >> 2] = inetPton4(DNS.lookup_name(name));
-			HEAP32[(ret + 16) >> 2] = addrListBuf;
+			GROWABLE_HEAP_I32()[addrListBuf >> 2] = addrListBuf + 8;
+			GROWABLE_HEAP_I32()[(addrListBuf + 4) >> 2] = 0;
+			GROWABLE_HEAP_I32()[(addrListBuf + 8) >> 2] = inetPton4(DNS.lookup_name(name));
+			GROWABLE_HEAP_I32()[(ret + 16) >> 2] = addrListBuf;
 			return ret;
 		}
 		function _gethostbyaddr(addr, addrlen, type) {
+			if (ENVIRONMENT_IS_PTHREAD)
+				return _emscripten_proxy_to_main_thread_js(63, 1, addr, addrlen, type);
 			if (type !== 2) {
 				setErrNo(5);
 				return null;
 			}
-			addr = HEAP32[addr >> 2];
+			addr = GROWABLE_HEAP_I32()[addr >> 2];
 			var host = inetNtop4(addr);
 			var lookup = DNS.lookup_addr(host);
 			if (lookup) {
@@ -5862,13 +6479,14 @@ var createPythonModule = (() => {
 			return getHostByName(host);
 		}
 		function _gethostbyname(name) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(64, 1, name);
 			return getHostByName(UTF8ToString(name));
 		}
 		function _getloadavg(loadavg, nelem) {
 			var limit = Math.min(nelem, 3);
 			var doubleSize = 8;
 			for (var i = 0; i < limit; i++) {
-				HEAPF64[(loadavg + i * doubleSize) >> 3] = 0.1;
+				GROWABLE_HEAP_F64()[(loadavg + i * doubleSize) >> 3] = 0.1;
 			}
 			return limit;
 		}
@@ -5918,13 +6536,13 @@ var createPythonModule = (() => {
 					var alias = aliases[i];
 					var aliasBuf = _malloc(alias.length + 1);
 					writeAsciiToMemory(alias, aliasBuf);
-					HEAP32[(aliasListBuf + j) >> 2] = aliasBuf;
+					GROWABLE_HEAP_I32()[(aliasListBuf + j) >> 2] = aliasBuf;
 				}
-				HEAP32[(aliasListBuf + j) >> 2] = 0;
+				GROWABLE_HEAP_I32()[(aliasListBuf + j) >> 2] = 0;
 				var pe = _malloc(12);
-				HEAP32[pe >> 2] = nameBuf;
-				HEAP32[(pe + 4) >> 2] = aliasListBuf;
-				HEAP32[(pe + 8) >> 2] = proto;
+				GROWABLE_HEAP_I32()[pe >> 2] = nameBuf;
+				GROWABLE_HEAP_I32()[(pe + 4) >> 2] = aliasListBuf;
+				GROWABLE_HEAP_I32()[(pe + 8) >> 2] = proto;
 				return pe;
 			}
 			var list = Protocols.list;
@@ -5946,6 +6564,7 @@ var createPythonModule = (() => {
 			return result;
 		}
 		function _proc_exit(code) {
+			if (ENVIRONMENT_IS_PTHREAD) return _emscripten_proxy_to_main_thread_js(65, 1, code);
 			procExit(code);
 		}
 		function __isLeapYear(year) {
@@ -5981,18 +6600,18 @@ var createPythonModule = (() => {
 			return newDate;
 		}
 		function _strftime(s, maxsize, format, tm) {
-			var tm_zone = HEAP32[(tm + 40) >> 2];
+			var tm_zone = GROWABLE_HEAP_I32()[(tm + 40) >> 2];
 			var date = {
-				tm_sec: HEAP32[tm >> 2],
-				tm_min: HEAP32[(tm + 4) >> 2],
-				tm_hour: HEAP32[(tm + 8) >> 2],
-				tm_mday: HEAP32[(tm + 12) >> 2],
-				tm_mon: HEAP32[(tm + 16) >> 2],
-				tm_year: HEAP32[(tm + 20) >> 2],
-				tm_wday: HEAP32[(tm + 24) >> 2],
-				tm_yday: HEAP32[(tm + 28) >> 2],
-				tm_isdst: HEAP32[(tm + 32) >> 2],
-				tm_gmtoff: HEAP32[(tm + 36) >> 2],
+				tm_sec: GROWABLE_HEAP_I32()[tm >> 2],
+				tm_min: GROWABLE_HEAP_I32()[(tm + 4) >> 2],
+				tm_hour: GROWABLE_HEAP_I32()[(tm + 8) >> 2],
+				tm_mday: GROWABLE_HEAP_I32()[(tm + 12) >> 2],
+				tm_mon: GROWABLE_HEAP_I32()[(tm + 16) >> 2],
+				tm_year: GROWABLE_HEAP_I32()[(tm + 20) >> 2],
+				tm_wday: GROWABLE_HEAP_I32()[(tm + 24) >> 2],
+				tm_yday: GROWABLE_HEAP_I32()[(tm + 28) >> 2],
+				tm_isdst: GROWABLE_HEAP_I32()[(tm + 32) >> 2],
+				tm_gmtoff: GROWABLE_HEAP_I32()[(tm + 36) >> 2],
 				tm_zone: tm_zone ? UTF8ToString(tm_zone) : ''
 			};
 			var pattern = UTF8ToString(format);
@@ -6240,6 +6859,7 @@ var createPythonModule = (() => {
 			setErrNo(52);
 			return -1;
 		}
+		PThread.init();
 		var FSNode = function (parent, name, mode, rdev) {
 			if (!parent) {
 				parent = this;
@@ -6415,6 +7035,74 @@ var createPythonModule = (() => {
 			EOWNERDEAD: 62,
 			ESTRPIPE: 135
 		};
+		var proxiedFunctionTable = [
+			null,
+			exitOnMainThread,
+			pthreadCreateProxied,
+			___syscall__newselect,
+			___syscall_accept4,
+			___syscall_bind,
+			___syscall_chdir,
+			___syscall_chmod,
+			___syscall_connect,
+			___syscall_dup3,
+			___syscall_faccessat,
+			___syscall_fchdir,
+			___syscall_fchmod,
+			___syscall_fchmodat,
+			___syscall_fchown32,
+			___syscall_fchownat,
+			___syscall_fcntl64,
+			___syscall_fdatasync,
+			___syscall_fstat64,
+			___syscall_fstatfs64,
+			___syscall_statfs64,
+			___syscall_ftruncate64,
+			___syscall_getcwd,
+			___syscall_getdents64,
+			___syscall_getpeername,
+			___syscall_getsockname,
+			___syscall_getsockopt,
+			___syscall_ioctl,
+			___syscall_listen,
+			___syscall_lstat64,
+			___syscall_mkdirat,
+			___syscall_newfstatat,
+			___syscall_openat,
+			___syscall_pipe,
+			___syscall_poll,
+			___syscall_readlinkat,
+			___syscall_recvfrom,
+			___syscall_recvmsg,
+			___syscall_renameat,
+			___syscall_rmdir,
+			___syscall_sendmsg,
+			___syscall_sendto,
+			___syscall_socket,
+			___syscall_stat64,
+			___syscall_symlink,
+			___syscall_truncate64,
+			___syscall_unlinkat,
+			___syscall_utimensat,
+			__mmap_js,
+			__msync_js,
+			__munmap_js,
+			_tzset_impl,
+			_environ_get,
+			_environ_sizes_get,
+			_fd_close,
+			_fd_fdstat_get,
+			_fd_pread,
+			_fd_pwrite,
+			_fd_read,
+			_fd_seek,
+			_fd_sync,
+			_fd_write,
+			_getaddrinfo,
+			_gethostbyaddr,
+			_gethostbyname,
+			_proc_exit
+		];
 		function intArrayFromString(stringy, dontAddNull, length) {
 			var len = length > 0 ? length : lengthBytesUTF8(stringy) + 1;
 			var u8array = new Array(len);
@@ -6423,135 +7111,195 @@ var createPythonModule = (() => {
 			return u8array;
 		}
 		var asmLibraryArg = {
-			t: _Py_CheckEmscriptenSignals_Helper,
-			wa: _Py_emscripten_runtime,
-			ea: ___call_sighandler,
-			x: ___map_file,
-			aa: ___syscall__newselect,
-			n: ___syscall_accept4,
-			V: ___syscall_bind,
-			A: ___syscall_chdir,
-			z: ___syscall_chmod,
-			T: ___syscall_connect,
-			w: ___syscall_dup3,
-			B: ___syscall_faccessat,
-			H: ___syscall_fadvise64,
-			sa: ___syscall_fchdir,
-			ra: ___syscall_fchmod,
-			u: ___syscall_fchmodat,
-			qa: ___syscall_fchown32,
-			y: ___syscall_fchownat,
-			b: ___syscall_fcntl64,
-			pa: ___syscall_fdatasync,
-			oa: ___syscall_fstat64,
-			_: ___syscall_fstatfs64,
-			J: ___syscall_ftruncate64,
-			ka: ___syscall_getcwd,
-			da: ___syscall_getdents64,
-			S: ___syscall_getpeername,
-			R: ___syscall_getsockname,
-			Q: ___syscall_getsockopt,
-			D: ___syscall_ioctl,
-			P: ___syscall_listen,
-			ma: ___syscall_lstat64,
-			r: ___syscall_mkdirat,
-			i: ___syscall_newfstatat,
-			e: ___syscall_openat,
-			ga: ___syscall_pipe,
-			fa: ___syscall_poll,
-			q: ___syscall_readlinkat,
-			O: ___syscall_recvfrom,
-			N: ___syscall_recvmsg,
-			p: ___syscall_renameat,
-			ca: ___syscall_rmdir,
-			M: ___syscall_sendmsg,
-			L: ___syscall_sendto,
-			m: ___syscall_socket,
-			na: ___syscall_stat64,
-			$: ___syscall_statfs64,
-			Z: ___syscall_symlink,
-			E: ___syscall_truncate64,
-			o: ___syscall_unlinkat,
-			X: ___syscall_utimensat,
-			f: __emscripten_date_now,
-			v: __emscripten_get_now_is_monotonic,
-			ua: __gmtime_js,
-			va: __localtime_js,
-			xa: __mktime_js,
-			ha: __mmap_js,
-			ia: __msync_js,
-			ja: __munmap_js,
-			ya: __tzset_js,
-			a: _abort,
-			Y: _emscripten_get_heap_max,
-			j: _emscripten_get_now,
-			ta: _emscripten_get_now_res,
-			za: _emscripten_memcpy_big,
-			W: _emscripten_resize_heap,
-			Ba: _environ_get,
-			Ca: _environ_sizes_get,
-			d: _exit,
-			c: _fd_close,
-			s: _fd_fdstat_get,
-			G: _fd_pread,
-			F: _fd_pwrite,
-			k: _fd_read,
-			I: _fd_seek,
-			la: _fd_sync,
-			h: _fd_write,
-			g: _getaddrinfo,
-			C: _getentropy,
-			U: _gethostbyaddr,
-			ba: _gethostbyname,
-			Ea: _getloadavg,
-			l: _getnameinfo,
-			K: _getprotobyname,
-			Aa: _proc_exit,
-			Da: _strftime,
-			Fa: _system
+			w: _Py_CheckEmscriptenSignals_Helper,
+			Ja: _Py_emscripten_runtime,
+			O: ___call_main,
+			ja: ___call_sighandler,
+			ta: ___emscripten_init_main_thread_js,
+			s: ___emscripten_thread_cleanup,
+			B: ___map_file,
+			ka: ___pthread_create_js,
+			ga: ___syscall__newselect,
+			o: ___syscall_accept4,
+			Z: ___syscall_bind,
+			E: ___syscall_chdir,
+			D: ___syscall_chmod,
+			X: ___syscall_connect,
+			A: ___syscall_dup3,
+			F: ___syscall_faccessat,
+			L: ___syscall_fadvise64,
+			Ea: ___syscall_fchdir,
+			Da: ___syscall_fchmod,
+			x: ___syscall_fchmodat,
+			Ca: ___syscall_fchown32,
+			C: ___syscall_fchownat,
+			c: ___syscall_fcntl64,
+			Ba: ___syscall_fdatasync,
+			Aa: ___syscall_fstat64,
+			da: ___syscall_fstatfs64,
+			N: ___syscall_ftruncate64,
+			wa: ___syscall_getcwd,
+			ia: ___syscall_getdents64,
+			W: ___syscall_getpeername,
+			V: ___syscall_getsockname,
+			U: ___syscall_getsockopt,
+			H: ___syscall_ioctl,
+			T: ___syscall_listen,
+			ya: ___syscall_lstat64,
+			u: ___syscall_mkdirat,
+			k: ___syscall_newfstatat,
+			g: ___syscall_openat,
+			pa: ___syscall_pipe,
+			oa: ___syscall_poll,
+			r: ___syscall_readlinkat,
+			S: ___syscall_recvfrom,
+			R: ___syscall_recvmsg,
+			q: ___syscall_renameat,
+			ha: ___syscall_rmdir,
+			Q: ___syscall_sendmsg,
+			P: ___syscall_sendto,
+			n: ___syscall_socket,
+			za: ___syscall_stat64,
+			ea: ___syscall_statfs64,
+			ca: ___syscall_symlink,
+			I: ___syscall_truncate64,
+			p: ___syscall_unlinkat,
+			$: ___syscall_utimensat,
+			h: __emscripten_date_now,
+			la: __emscripten_default_pthread_stack_size,
+			z: __emscripten_get_now_is_monotonic,
+			na: __emscripten_notify_proxying_queue,
+			va: __emscripten_set_offscreencanvas_size,
+			Ga: __gmtime_js,
+			Ha: __localtime_js,
+			Ia: __mktime_js,
+			qa: __mmap_js,
+			ra: __msync_js,
+			sa: __munmap_js,
+			Ka: __tzset_js,
+			b: _abort,
+			t: _emscripten_check_blocking_allowed,
+			aa: _emscripten_get_heap_max,
+			d: _emscripten_get_now,
+			Fa: _emscripten_get_now_res,
+			La: _emscripten_memcpy_big,
+			ba: _emscripten_num_logical_cores,
+			ua: _emscripten_receive_on_main_thread_js,
+			_: _emscripten_resize_heap,
+			y: _emscripten_unwind_to_js_event_loop,
+			Na: _environ_get,
+			Oa: _environ_sizes_get,
+			f: _exit,
+			e: _fd_close,
+			v: _fd_fdstat_get,
+			K: _fd_pread,
+			J: _fd_pwrite,
+			l: _fd_read,
+			M: _fd_seek,
+			xa: _fd_sync,
+			j: _fd_write,
+			i: _getaddrinfo,
+			G: _getentropy,
+			fa: _gethostbyaddr,
+			ma: _gethostbyname,
+			Qa: _getloadavg,
+			m: _getnameinfo,
+			Y: _getprotobyname,
+			a: wasmMemory || Module['wasmMemory'],
+			Ma: _proc_exit,
+			Pa: _strftime,
+			Ra: _system
 		};
 		var asm = createWasm();
 		var ___wasm_call_ctors = (Module['___wasm_call_ctors'] = function () {
-			return (___wasm_call_ctors = Module['___wasm_call_ctors'] = Module['asm']['Ha']).apply(
+			return (___wasm_call_ctors = Module['___wasm_call_ctors'] = Module['asm']['Sa']).apply(
 				null,
 				arguments
 			);
 		});
 		var _main = (Module['_main'] = function () {
-			return (_main = Module['_main'] = Module['asm']['Ia']).apply(null, arguments);
+			return (_main = Module['_main'] = Module['asm']['Ta']).apply(null, arguments);
 		});
 		var ___errno_location = (Module['___errno_location'] = function () {
-			return (___errno_location = Module['___errno_location'] = Module['asm']['Ja']).apply(
+			return (___errno_location = Module['___errno_location'] = Module['asm']['Ua']).apply(
 				null,
 				arguments
 			);
 		});
 		var _malloc = (Module['_malloc'] = function () {
-			return (_malloc = Module['_malloc'] = Module['asm']['La']).apply(null, arguments);
+			return (_malloc = Module['_malloc'] = Module['asm']['Wa']).apply(null, arguments);
+		});
+		var _pthread_self = (Module['_pthread_self'] = function () {
+			return (_pthread_self = Module['_pthread_self'] = Module['asm']['Xa']).apply(null, arguments);
 		});
 		var _ntohs = (Module['_ntohs'] = function () {
-			return (_ntohs = Module['_ntohs'] = Module['asm']['Ma']).apply(null, arguments);
+			return (_ntohs = Module['_ntohs'] = Module['asm']['Ya']).apply(null, arguments);
 		});
 		var _htons = (Module['_htons'] = function () {
-			return (_htons = Module['_htons'] = Module['asm']['Na']).apply(null, arguments);
+			return (_htons = Module['_htons'] = Module['asm']['Za']).apply(null, arguments);
 		});
 		var _htonl = (Module['_htonl'] = function () {
-			return (_htonl = Module['_htonl'] = Module['asm']['Oa']).apply(null, arguments);
+			return (_htonl = Module['_htonl'] = Module['asm']['_a']).apply(null, arguments);
+		});
+		var _emscripten_tls_init = (Module['_emscripten_tls_init'] = function () {
+			return (_emscripten_tls_init = Module['_emscripten_tls_init'] = Module['asm']['$a']).apply(
+				null,
+				arguments
+			);
 		});
 		var _emscripten_builtin_memalign = (Module['_emscripten_builtin_memalign'] = function () {
 			return (_emscripten_builtin_memalign = Module['_emscripten_builtin_memalign'] =
-				Module['asm']['Pa']).apply(null, arguments);
+				Module['asm']['ab']).apply(null, arguments);
+		});
+		var _emscripten_proxy_main = (Module['_emscripten_proxy_main'] = function () {
+			return (_emscripten_proxy_main = Module['_emscripten_proxy_main'] =
+				Module['asm']['bb']).apply(null, arguments);
+		});
+		var __emscripten_thread_init = (Module['__emscripten_thread_init'] = function () {
+			return (__emscripten_thread_init = Module['__emscripten_thread_init'] =
+				Module['asm']['cb']).apply(null, arguments);
+		});
+		var __emscripten_thread_crashed = (Module['__emscripten_thread_crashed'] = function () {
+			return (__emscripten_thread_crashed = Module['__emscripten_thread_crashed'] =
+				Module['asm']['db']).apply(null, arguments);
+		});
+		var _emscripten_proxy_execute_queue = (Module['_emscripten_proxy_execute_queue'] = function () {
+			return (_emscripten_proxy_execute_queue = Module['_emscripten_proxy_execute_queue'] =
+				Module['asm']['eb']).apply(null, arguments);
+		});
+		var _emscripten_run_in_main_runtime_thread_js = (Module[
+			'_emscripten_run_in_main_runtime_thread_js'
+		] = function () {
+			return (_emscripten_run_in_main_runtime_thread_js = Module[
+				'_emscripten_run_in_main_runtime_thread_js'
+			] =
+				Module['asm']['fb']).apply(null, arguments);
+		});
+		var __emscripten_thread_free_data = (Module['__emscripten_thread_free_data'] = function () {
+			return (__emscripten_thread_free_data = Module['__emscripten_thread_free_data'] =
+				Module['asm']['gb']).apply(null, arguments);
+		});
+		var __emscripten_thread_exit = (Module['__emscripten_thread_exit'] = function () {
+			return (__emscripten_thread_exit = Module['__emscripten_thread_exit'] =
+				Module['asm']['hb']).apply(null, arguments);
+		});
+		var _emscripten_stack_set_limits = (Module['_emscripten_stack_set_limits'] = function () {
+			return (_emscripten_stack_set_limits = Module['_emscripten_stack_set_limits'] =
+				Module['asm']['ib']).apply(null, arguments);
 		});
 		var stackSave = (Module['stackSave'] = function () {
-			return (stackSave = Module['stackSave'] = Module['asm']['Qa']).apply(null, arguments);
+			return (stackSave = Module['stackSave'] = Module['asm']['jb']).apply(null, arguments);
 		});
 		var stackRestore = (Module['stackRestore'] = function () {
-			return (stackRestore = Module['stackRestore'] = Module['asm']['Ra']).apply(null, arguments);
+			return (stackRestore = Module['stackRestore'] = Module['asm']['kb']).apply(null, arguments);
 		});
 		var stackAlloc = (Module['stackAlloc'] = function () {
-			return (stackAlloc = Module['stackAlloc'] = Module['asm']['Sa']).apply(null, arguments);
+			return (stackAlloc = Module['stackAlloc'] = Module['asm']['lb']).apply(null, arguments);
 		});
-		var _Py_EMSCRIPTEN_SIGNAL_HANDLING = (Module['_Py_EMSCRIPTEN_SIGNAL_HANDLING'] = 3379008);
+		var _Py_EMSCRIPTEN_SIGNAL_HANDLING = (Module['_Py_EMSCRIPTEN_SIGNAL_HANDLING'] = 3379184);
+		var __emscripten_allow_main_runtime_queued_calls = (Module[
+			'__emscripten_allow_main_runtime_queued_calls'
+		] = 3372404);
 		Module['cwrap'] = cwrap;
 		Module['addRunDependency'] = addRunDependency;
 		Module['removeRunDependency'] = removeRunDependency;
@@ -6561,6 +7309,11 @@ var createPythonModule = (() => {
 		Module['FS_createLazyFile'] = FS.createLazyFile;
 		Module['FS_createDevice'] = FS.createDevice;
 		Module['FS_unlink'] = FS.unlink;
+		Module['keepRuntimeAlive'] = keepRuntimeAlive;
+		Module['PThread'] = PThread;
+		Module['PThread'] = PThread;
+		Module['wasmMemory'] = wasmMemory;
+		Module['ExitStatus'] = ExitStatus;
 		var calledRun;
 		function ExitStatus(status) {
 			this.name = 'ExitStatus';
@@ -6573,21 +7326,17 @@ var createPythonModule = (() => {
 			if (!calledRun) dependenciesFulfilled = runCaller;
 		};
 		function callMain(args) {
-			var entryFunction = Module['_main'];
+			var entryFunction = Module['_emscripten_proxy_main'];
 			args = args || [];
 			var argc = args.length + 1;
 			var argv = stackAlloc((argc + 1) * 4);
-			HEAP32[argv >> 2] = allocateUTF8OnStack(thisProgram);
+			GROWABLE_HEAP_I32()[argv >> 2] = allocateUTF8OnStack(thisProgram);
 			for (var i = 1; i < argc; i++) {
-				HEAP32[(argv >> 2) + i] = allocateUTF8OnStack(args[i - 1]);
+				GROWABLE_HEAP_I32()[(argv >> 2) + i] = allocateUTF8OnStack(args[i - 1]);
 			}
-			HEAP32[(argv >> 2) + argc] = 0;
+			GROWABLE_HEAP_I32()[(argv >> 2) + argc] = 0;
 			try {
 				var ret = entryFunction(argc, argv);
-				exit(ret, true);
-				return ret;
-			} catch (e) {
-				return handleException(e);
 			} finally {
 				calledMain = true;
 			}
@@ -6595,6 +7344,12 @@ var createPythonModule = (() => {
 		function run(args) {
 			args = args || arguments_;
 			if (runDependencies > 0) {
+				return;
+			}
+			if (ENVIRONMENT_IS_PTHREAD) {
+				readyPromiseResolve(Module);
+				initRuntime();
+				postMessage({ cmd: 'loaded' });
 				return;
 			}
 			preRun();
@@ -6628,11 +7383,19 @@ var createPythonModule = (() => {
 		Module['run'] = run;
 		function exit(status, implicit) {
 			EXITSTATUS = status;
+			if (!implicit) {
+				if (ENVIRONMENT_IS_PTHREAD) {
+					exitOnMainThread(status);
+					throw 'unwind';
+				} else {
+				}
+			}
 			procExit(status);
 		}
 		function procExit(code) {
 			EXITSTATUS = code;
 			if (!keepRuntimeAlive()) {
+				PThread.terminateAllThreads();
 				if (Module['onExit']) Module['onExit'](code);
 				ABORT = true;
 			}
@@ -6647,6 +7410,9 @@ var createPythonModule = (() => {
 		var shouldRunNow = false;
 		if (Module['noInitialRun']) shouldRunNow = false;
 		run();
+
+		Module['callMain'] = callMain;
+		Module['exit'] = exit;
 
 		return createPythonModule.ready;
 	};

@@ -21,7 +21,8 @@ void (async function () {
     -s MODULARIZE=1 \
     -s EXPORT_ES6=1 \
     -s EXPORT_NAME=createAddModule \
-    --post-js add.post.emcc.js`;
+    --pre-js add.post.emcc.js \
+	--post-js add.post.emcc.js`;
 	const compileTime = (performance.now() - tic) / 1000;
 
 	cd(baseDir);

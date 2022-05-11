@@ -1,9 +1,9 @@
 <script lang="ts">
-	import AddDemo from '$containers/AddDemo.svelte';
+	import PyDemo from '$containers/PyDemo.svelte';
 </script>
 
 <section class="section">
 	<div class="container">
-		<AddDemo />
+		<PyDemo />
 	</div>
 </section>

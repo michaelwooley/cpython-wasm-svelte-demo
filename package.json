@@ -30,6 +30,7 @@
 	"devDependencies": {
 		"@playwright/test": "^1.21.0",
 		"@sveltejs/adapter-netlify": "^1.0.0-next.56",
+		"@sveltejs/adapter-static": "^1.0.0-next.29",
 		"@sveltejs/kit": "next",
 		"@swc/core": "^1.2.175",
 		"@swc/helpers": "^0.3.13",

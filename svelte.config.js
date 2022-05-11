@@ -1,4 +1,5 @@
-import adapter from '@sveltejs/adapter-netlify';
+// import adapter from '@sveltejs/adapter-netlify';
+import adapter from '@sveltejs/adapter-static';
 import preprocess from 'svelte-preprocess';
 import { resolve } from 'path';
 
@@ -26,9 +27,12 @@ const config = {
 			//
 			// We need netlify (or something beyond github pages) because it allows us to send
 			// the response headers required by SharedArrayBuffer.
-			edge: false,
-			split: false
+			// edge: false,
+			// split: false
 		}),
+		prerender: {
+			default: true
+		},
 
 		vite: {
 			resolve: {
@@ -46,7 +50,18 @@ const config = {
 				}
 			},
 
-			build: {},
+			build: {
+				assetsInlineLimit: 0,
+				// ssr: false,
+				commonjsOptions: {
+					// exclude: ['./src/lib/pywasm/*.emcc.js']
+				}
+			},
+
+			optimizeDeps: {
+				// exclude: ['./src/lib/pywasm/*.emcc.js']
+				// disabled: true
+			},
 
 			server: {
 				headers: {
