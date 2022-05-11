@@ -1,3 +1,23 @@
 {
-	"svelte.plugin.svelte.useNewTransformation": true
+	"svelte.plugin.svelte.useNewTransformation": true,
+	"C_Cpp.errorSquiggles": "Enabled",
+	"files.associations": {
+		"*.json_schema": "json",
+		"*.jsonschema": "jsonc",
+		"Makefile": "makefile",
+		".env": "env",
+		"*.json": "json",
+		"*.svx": "markdown",
+		"array": "c",
+		"*.tcc": "c",
+		"compare": "c",
+		"fstream": "c",
+		"future": "c",
+		"ostream": "c",
+		"ratio": "c",
+		"sstream": "c",
+		"streambuf": "c",
+		"typeinfo": "c",
+		"html5.h": "c"
+	}
 }
