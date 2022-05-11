@@ -14,8 +14,10 @@ const config = {
 		})
 	],
 
+	// NOTE SSR is currently disabled in hooks.ts via handle.
+	// REFERENCE https://kit.svelte.dev/docs/hooks#handle
 	compilerOptions: {
-		generate: 'dom' //
+		// generate: 'dom' //
 	},
 
 	kit: {
