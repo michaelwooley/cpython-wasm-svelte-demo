@@ -8,7 +8,7 @@
 // This is the entry point file that is loaded first by each Web Worker
 // that executes pthreads on the Emscripten application.
 
-'use strict';
+// 'use strict';
 
 var Module = {};
 
@@ -62,7 +62,7 @@ self.onmessage = (e) => {
 
 			Module['ENVIRONMENT_IS_PTHREAD'] = true;
 
-			(e.data.urlOrBlob ? import(e.data.urlOrBlob) : import('./add.emcc.js'))
+			(e.data.urlOrBlob ? import(e.data.urlOrBlob /* @vite-ignore */) : import('./add.emcc.js'))
 				.then(function (exports) {
 					return exports.default(Module);
 				})

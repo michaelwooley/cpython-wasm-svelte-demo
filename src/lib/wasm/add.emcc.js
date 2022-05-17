@@ -2552,14 +2552,17 @@ var createAddModule = (() => {
 			allocateUnusedWorker: function () {
 				// If we're using module output and there's no explicit override, use bundler-friendly pattern.
 				if (!Module['locateFile']) {
-					PThread.unusedWorkers.push(new Worker(new URL('add.emcc.worker.js', import.meta.url)));
-					return;
+					// PThread.unusedWorkers.push(new Worker(new URL('add.emcc.worker.js', import.meta.url)));
+					// return;
+					throw new Error('ssfsa');
 				}
 				// Allow HTML module to configure the location where the 'worker.js' file will be loaded from,
 				// via Module.locateFile() function. If not specified, then the default URL 'worker.js' relative
 				// to the main html file is loaded.
 				var pthreadMainJs = locateFile('add.emcc.worker.js');
+				console.log(pthreadMainJs);
 				PThread.unusedWorkers.push(new Worker(pthreadMainJs));
+				// PThread.unusedWorkers.push(new pthreadMainJs());
 			},
 			getNewWorker: function () {
 				if (PThread.unusedWorkers.length == 0) {

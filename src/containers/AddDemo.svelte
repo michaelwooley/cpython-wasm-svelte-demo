@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import createAddModule from '$lib/wasm/add.emcc';
+	// import createAddModule from '$lib/wasm/add.emcc';
 	import type { AddModule } from '$lib/wasm/add.emcc.d';
+	// import workerUrl from '$lib/wasm/add.emcc.worker.js?url';
+	import workerUrl from '$lib/wasm/add.emcc.worker?url';
+	import wasmUrl from '$lib/wasm/add.emcc.wasm?url';
+	import addMainUrl from '$lib/wasm/add.emcc.js?url';
 
 	let a = 4;
 	let b = 5;
@@ -9,7 +13,30 @@
 
 	let mod: AddModule;
 	onMount(async () => {
-		mod = await createAddModule();
+		console.log(workerUrl);
+		const MyWorker = await (await import('$lib/wasm/add.emcc.worker?worker')).default;
+
+		console.log(MyWorker);
+
+		let Mod = {
+			// mainScriptUrlOrBlob: addMainUrl,
+			locateFile: (s: string): string => {
+				return (
+					{
+						'add.emcc.worker.js': workerUrl, //MyWorker,
+						'add.emcc.wasm': wasmUrl
+					}[s] || s
+				);
+			}
+			// onRuntimeInitialized: function () {
+			// 	// Just Module._add() will work, but I'm just demontrating usage of cwrap
+			// 	Module['add'] = cwrap('add', 'number', ['number', 'number']);
+			// }
+		};
+		const createAddModule = await (await import('$lib/wasm/add.emcc')).default;
+		mod = await createAddModule(Mod);
+
+		console.log(mod);
 		handleChange();
 	});
 
