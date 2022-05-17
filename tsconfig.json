@@ -5,7 +5,7 @@
 		"checkJs": true,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
-		"lib": ["es2020", "DOM", "WebWorker"],
+		"lib": ["es2020", "DOM", "WebWorker", "WebWorker.ImportScripts"],
 		"moduleResolution": "node",
 		"module": "es2020",
 		"resolveJsonModule": true,

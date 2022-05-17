@@ -3,7 +3,7 @@
 	// import createAddModule from '$lib/wasm/add.emcc';
 	import type { AddModule } from '$lib/wasm/add.emcc.d';
 	// import workerUrl from '$lib/wasm/add.emcc.worker.js?url';
-	import workerUrl from '$lib/wasm/add.emcc.worker?url';
+	// import workerUrl from '$lib/wasm/add.emcc.worker?url';
 	import wasmUrl from '$lib/wasm/add.emcc.wasm?url';
 	import addMainUrl from '$lib/wasm/add.emcc.js?url';
 
@@ -13,7 +13,7 @@
 
 	let mod: AddModule;
 	onMount(async () => {
-		console.log(workerUrl);
+		// console.log(workerUrl);
 		const MyWorker = await (await import('$lib/wasm/add.emcc.worker?worker')).default;
 
 		console.log(MyWorker);
@@ -23,7 +23,7 @@
 			locateFile: (s: string): string => {
 				return (
 					{
-						'add.emcc.worker.js': workerUrl, //MyWorker,
+						'add.emcc.worker.js': MyWorker,
 						'add.emcc.wasm': wasmUrl
 					}[s] || s
 				);

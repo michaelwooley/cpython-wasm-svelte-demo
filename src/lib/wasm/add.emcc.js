@@ -2561,8 +2561,8 @@ var createAddModule = (() => {
 				// to the main html file is loaded.
 				var pthreadMainJs = locateFile('add.emcc.worker.js');
 				console.log(pthreadMainJs);
-				PThread.unusedWorkers.push(new Worker(pthreadMainJs));
-				// PThread.unusedWorkers.push(new pthreadMainJs());
+				// PThread.unusedWorkers.push(new Worker(pthreadMainJs));
+				PThread.unusedWorkers.push(new pthreadMainJs());
 			},
 			getNewWorker: function () {
 				if (PThread.unusedWorkers.length == 0) {

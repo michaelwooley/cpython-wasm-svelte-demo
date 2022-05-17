@@ -1,3 +1,4 @@
+/* @vite-ignore */
 /**
  * @license
  * Copyright 2015 The Emscripten Authors
