@@ -2,78 +2,58 @@
 	import createLoopModule from '$lib/loop/loop.emcc';
 	import { onMount } from 'svelte';
 
-	let progressElement: HTMLProgressElement;
-	let spinnerElement: HTMLDivElement;
-	let statusElement: HTMLDivElement;
+	let nClicks = 0;
 	let mod: any;
+	let printArr: string[] = [];
 	onMount(async () => {
 		var Module = {
+			noExitRuntime: false,
 			preRun: [],
 			postRun: [],
 			print: (function () {
-				return function (text) {
+				return function (text: string): void {
 					if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
-
+					printArr = printArr.concat([text]);
 					console.log(text);
 				};
-			})(),
-
-			setStatus: function (text) {
-				if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
-				if (text === Module.setStatus.last.text) return;
-				var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
-				var now = Date.now();
-				if (m && now - Module.setStatus.last.time < 30) return; // if this is a progress update, skip it if too soon
-				Module.setStatus.last.time = now;
-				Module.setStatus.last.text = text;
-				if (m) {
-					console.log(m);
-					text = m[1];
-					progressElement.value = parseInt(m[2]) * 100;
-					progressElement.max = parseInt(m[4]) * 100;
-					progressElement.hidden = false;
-					spinnerElement.hidden = false;
-				} else {
-					// progressElement.hidden = true;
-					// progressElement.value = null;
-					// progressElement.max = null;
-					// if (!text) spinnerElement.style.display = 'none';
-				}
-				statusElement.innerHTML = text;
-			},
-			totalDependencies: 0,
-			monitorRunDependencies: function (left) {
-				this.totalDependencies = Math.max(this.totalDependencies, left);
-				Module.setStatus(
-					left
-						? 'Preparing... (' +
-								(this.totalDependencies - left) +
-								'/' +
-								this.totalDependencies +
-								')'
-						: 'All downloads complete.'
-				);
-			}
+			})()
 		};
-		Module.setStatus('Downloading...');
+		// Module.setStatus('Downloading...');
 		mod = await createLoopModule(Module);
 
 		console.log(mod);
 	});
 </script>
 
-<div class="box">
+<!-- Svelte-level tracking of clicks -->
+<svelte:window
+	on:click|preventDefault={() => {
+		nClicks += 1;
+	}}
+/>
+
+<div class="p-4">
 	<div class="content">
-		<h2>Change the inputs to recompute with add!</h2>
-		<progress
-			class="progress"
-			value="0"
-			max="100"
-			id="progress"
-			hidden
-			bind:this={progressElement}
-		/>
-		<div class="spinner" id="spinner" bind:this={spinnerElement} />
-		<div class="emscripten" id="status" bind:this={statusElement}>Downloading...</div>
+		<h2>Click to see how events are handled!awfa</h2>
+	</div>
+
+	<div class="columns">
+		<div class="column">
+			<div class="box">
+				<div class="content">
+					<h3>WASM Output:</h3>
+				</div>
+				{#each printArr as el}
+					<div><code>{el}</code></div>
+				{/each}
+			</div>
+		</div>
+
+		<div class="column">
+			<div class="box">
+				Total clicks frontend: {nClicks}
+			</div>
+			<!-- <input type="number" class="input is-large" bind:value={b} on:keyup={handleChange} /> -->
+		</div>
 	</div>
 </div>
