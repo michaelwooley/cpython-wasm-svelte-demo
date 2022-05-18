@@ -10,6 +10,9 @@
 		const lw = new LoopWorker();
 		lw.onmessage = (e) => {
 			console.log('Component received message', self.performance.now(), e.data);
+			if (e.data.kind === 'print') {
+				printArr = printArr.concat([e.data.text]);
+			}
 		};
 	});
 </script>

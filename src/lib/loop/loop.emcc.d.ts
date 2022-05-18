@@ -14,4 +14,6 @@
 // 	add(a: number, b: number): number;
 // }
 
-export default async function createLoopModule(mod?: EmscriptenModule): Promise<EmscriptenModule>;
+export default async function createLoopModule(
+	mod?: Partial<EmscriptenModule>
+): Promise<EmscriptenModule>;

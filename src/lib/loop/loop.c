@@ -62,11 +62,15 @@ const char *beforeunload_callback(int eventType, const void *reserved, void *use
 }
 
 int async_call_trial_count = 0;
-void async_call_trial(void *)
+void async_call_trial(void *arg)
 {
     async_call_trial_count += 1;
 
     printf("async_call_trial: %d\n", async_call_trial_count);
+    if (async_call_trial_count > 100)
+    {
+        return;
+    }
     emscripten_async_call(async_call_trial, 0, 10);
 }
 
@@ -79,11 +83,12 @@ int main()
 
     /**
      *  DOM Handlers
+     *
+     *  // XXX Does not work when embedded in web worker!!
      */
-
-    EMSCRIPTEN_RESULT ret = emscripten_set_click_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, mouse_callback);
-    emscripten_set_beforeunload_callback(0,
-                                         beforeunload_callback);
+    // EMSCRIPTEN_RESULT ret = emscripten_set_click_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, mouse_callback);
+    // emscripten_set_beforeunload_callback(0,
+    //                                      beforeunload_callback);
 
     /**
      *  Main Module
