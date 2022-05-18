@@ -61,21 +61,38 @@ const char *beforeunload_callback(int eventType, const void *reserved, void *use
     return "";
 }
 
+int async_call_trial_count = 0;
+void async_call_trial(void *)
+{
+    async_call_trial_count += 1;
+
+    printf("async_call_trial: %d\n", async_call_trial_count);
+    emscripten_async_call(async_call_trial, 0, 10);
+}
+
 int main()
 {
-    struct context ctx;
-    int simulate_infinite_loop = 1;
-    int fps = 10;
+    /**
+     *  'async' calls: only works when the main loop releases.
+     */
+    emscripten_async_call(async_call_trial, 0, 10);
 
-    ctx.x = 0;
+    /**
+     *  DOM Handlers
+     */
 
     EMSCRIPTEN_RESULT ret = emscripten_set_click_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, mouse_callback);
     emscripten_set_beforeunload_callback(0,
                                          beforeunload_callback);
 
-    // [](int, const void *, void *) -> const char *
-    //                                      { emscripten_cancel_main_loop();  emscripten_force_exit(0); });
+    /**
+     *  Main Module
+     */
+    struct context ctx;
+    int simulate_infinite_loop = 1;
+    int fps = 10;
 
+    ctx.x = 0;
     emscripten_set_main_loop_arg(loop_fn, &ctx, fps, simulate_infinite_loop);
 
     /**

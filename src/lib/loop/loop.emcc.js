@@ -1920,23 +1920,6 @@ var createLoopModule = (() => {
 		// === Body ===
 
 		var ASM_CONSTS = {};
-		function enable_auto_refresh_client() {
-			var ws = null;
-			var to = null;
-			function conn() {
-				ws = new WebSocket('ws://' + location.hostname + ':3000/');
-				ws.onmessage = function (m) {
-					console.log(m.data);
-					clearTimeout(to);
-					to = setTimeout(function () {
-						location.reload(true);
-					}, 1500);
-				};
-			}
-			try {
-				conn();
-			} catch (e) {}
-		}
 
 		function callRuntimeCallbacks(callbacks) {
 			while (callbacks.length > 0) {
@@ -2048,6 +2031,34 @@ var createLoopModule = (() => {
 			return nowIsMonotonic;
 		}
 
+		/** @param {boolean=} synchronous */
+		function callUserCallback(func, synchronous) {
+			if (ABORT) {
+				err('user callback triggered after runtime exited or application aborted.  Ignoring.');
+				return;
+			}
+			// For synchronous calls, let any exceptions propagate, and don't let the runtime exit.
+			if (synchronous) {
+				func();
+				return;
+			}
+			try {
+				func();
+			} catch (e) {
+				handleException(e);
+			}
+		}
+
+		function runtimeKeepalivePush() {}
+
+		function runtimeKeepalivePop() {}
+		/** @param {number=} timeout */
+		function safeSetTimeout(func, timeout) {
+			return setTimeout(function () {
+				callUserCallback(func);
+			}, timeout);
+		}
+
 		function _emscripten_set_main_loop_timing(mode, value) {
 			Browser.mainLoop.timingMode = mode;
 			Browser.mainLoop.timingValue = value;
@@ -2112,8 +2123,6 @@ var createLoopModule = (() => {
 
 		var _emscripten_get_now;
 		_emscripten_get_now = () => performance.now();
-		function runtimeKeepalivePush() {}
-
 		function _exit(status) {
 			// void _exit(int status);
 			// http://pubs.opengroup.org/onlinepubs/000095399/functions/exit.html
@@ -2231,32 +2240,6 @@ var createLoopModule = (() => {
 			if (simulateInfiniteLoop) {
 				throw 'unwind';
 			}
-		}
-
-		/** @param {boolean=} synchronous */
-		function callUserCallback(func, synchronous) {
-			if (ABORT) {
-				err('user callback triggered after runtime exited or application aborted.  Ignoring.');
-				return;
-			}
-			// For synchronous calls, let any exceptions propagate, and don't let the runtime exit.
-			if (synchronous) {
-				func();
-				return;
-			}
-			try {
-				func();
-			} catch (e) {
-				handleException(e);
-			}
-		}
-
-		function runtimeKeepalivePop() {}
-		/** @param {number=} timeout */
-		function safeSetTimeout(func, timeout) {
-			return setTimeout(function () {
-				callUserCallback(func);
-			}, timeout);
 		}
 		var Browser = {
 			mainLoop: {
@@ -2967,6 +2950,18 @@ var createLoopModule = (() => {
 				}
 			}
 		};
+		function _emscripten_async_call(func, arg, millis) {
+			function wrapper() {
+				getWasmTableEntry(func)(arg);
+			}
+
+			if (millis >= 0) {
+				safeSetTimeout(wrapper, millis);
+			} else {
+				Browser.safeRequestAnimationFrame(wrapper);
+			}
+		}
+
 		function _emscripten_cancel_main_loop() {
 			Browser.mainLoop.pause();
 			Browser.mainLoop.func = null;
@@ -3401,6 +3396,7 @@ var createLoopModule = (() => {
 		var asmLibraryArg = {
 			_emscripten_date_now: __emscripten_date_now,
 			_emscripten_get_now_is_monotonic: __emscripten_get_now_is_monotonic,
+			emscripten_async_call: _emscripten_async_call,
 			emscripten_cancel_main_loop: _emscripten_cancel_main_loop,
 			emscripten_get_now: _emscripten_get_now,
 			emscripten_memcpy_big: _emscripten_memcpy_big,
@@ -3409,7 +3405,6 @@ var createLoopModule = (() => {
 				_emscripten_set_beforeunload_callback_on_thread,
 			emscripten_set_click_callback_on_thread: _emscripten_set_click_callback_on_thread,
 			emscripten_set_main_loop_arg: _emscripten_set_main_loop_arg,
-			enable_auto_refresh_client: enable_auto_refresh_client,
 			fd_write: _fd_write,
 			setTempRet0: _setTempRet0
 		};

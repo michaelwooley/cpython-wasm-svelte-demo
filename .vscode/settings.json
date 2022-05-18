@@ -1,3 +1,20 @@
 {
-	"svelte.plugin.svelte.useNewTransformation": true
+	"svelte.plugin.svelte.useNewTransformation": true,
+	"files.associations": {
+		"*.json_schema": "json",
+		"*.jsonschema": "jsonc",
+		"Makefile": "makefile",
+		".env": "env",
+		"*.json": "json",
+		"*.svx": "markdown",
+		"hash_map": "c",
+		"bit": "c",
+		"chrono": "c",
+		"condition_variable": "c",
+		"algorithm": "c",
+		"istream": "c",
+		"limits": "c",
+		"mutex": "c",
+		"streambuf": "c"
+	}
 }
