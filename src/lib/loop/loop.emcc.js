@@ -2029,6 +2029,15 @@ var createLoopModule = (() => {
 			return demangleAll(js);
 		}
 
+		function __emscripten_date_now() {
+			return Date.now();
+		}
+
+		var nowIsMonotonic = true;
+		function __emscripten_get_now_is_monotonic() {
+			return nowIsMonotonic;
+		}
+
 		function _emscripten_set_main_loop_timing(mode, value) {
 			Browser.mainLoop.timingMode = mode;
 			Browser.mainLoop.timingValue = value;
@@ -3085,7 +3094,10 @@ var createLoopModule = (() => {
 			ignoredModuleProp('fetchSettings');
 		}
 		var asmLibraryArg = {
+			_emscripten_date_now: __emscripten_date_now,
+			_emscripten_get_now_is_monotonic: __emscripten_get_now_is_monotonic,
 			emscripten_cancel_main_loop: _emscripten_cancel_main_loop,
+			emscripten_get_now: _emscripten_get_now,
 			emscripten_memcpy_big: _emscripten_memcpy_big,
 			emscripten_set_main_loop_arg: _emscripten_set_main_loop_arg,
 			fd_write: _fd_write,

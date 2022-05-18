@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <unistd.h>
 
 /**
  * Provides emscripten_set_main_loop_arg and emscripten_cancel_main_loop
@@ -22,6 +23,7 @@ void loop_fn(void *arg)
     struct context *ctx = arg;
 
     printf("x: %d\n", ctx->x);
+    usleep(1000000);
 
     if (ctx->x >= 100)
     {
