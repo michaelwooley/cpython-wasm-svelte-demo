@@ -10,7 +10,8 @@ const libs = {
 		'-sMODULARIZE=1',
 		'-sEXPORT_ES6=1',
 		'-sEXPORT_NAME=createLoopModule',
-		'-sENVIRONMENT=web,worker'
+		'-sENVIRONMENT=web,worker',
+		'-D DEV=1' // Macro flag
 	],
 	add: [
 		// TODO Revert back to old...

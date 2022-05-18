@@ -1920,6 +1920,23 @@ var createLoopModule = (() => {
 		// === Body ===
 
 		var ASM_CONSTS = {};
+		function enable_auto_refresh_client() {
+			var ws = null;
+			var to = null;
+			function conn() {
+				ws = new WebSocket('ws://' + location.hostname + ':3000/');
+				ws.onmessage = function (m) {
+					console.log(m.data);
+					clearTimeout(to);
+					to = setTimeout(function () {
+						location.reload(true);
+					}, 1500);
+				};
+			}
+			try {
+				conn();
+			} catch (e) {}
+		}
 
 		function callRuntimeCallbacks(callbacks) {
 			while (callbacks.length > 0) {
@@ -3392,6 +3409,7 @@ var createLoopModule = (() => {
 				_emscripten_set_beforeunload_callback_on_thread,
 			emscripten_set_click_callback_on_thread: _emscripten_set_click_callback_on_thread,
 			emscripten_set_main_loop_arg: _emscripten_set_main_loop_arg,
+			enable_auto_refresh_client: enable_auto_refresh_client,
 			fd_write: _fd_write,
 			setTempRet0: _setTempRet0
 		};
