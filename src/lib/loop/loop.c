@@ -36,8 +36,8 @@ void loop_fn(void *arg)
     }
 
     ctx->x += 1;
-    // usleep(1000000);
-    usleep(500000);
+    usleep(1000000);
+    // usleep(500000);
 }
 
 int gotClick = 0;
@@ -94,8 +94,8 @@ int main()
      *  Main Module
      */
     struct context ctx;
-    int simulate_infinite_loop = 1;
-    int fps = 10;
+    int simulate_infinite_loop = 1; // NOTE What if =0?  Goes straight to: "x: 5245864"?????
+    int fps = -1;                   // 10; // NOTE Set -1 to use browser native.
 
     ctx.x = 0;
     emscripten_set_main_loop_arg(loop_fn, &ctx, fps, simulate_infinite_loop);

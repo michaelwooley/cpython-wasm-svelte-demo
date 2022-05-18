@@ -11,7 +11,7 @@ let Module: Partial<EmscriptenModule> = {
 	preRun: [],
 	postRun: [],
 	print: function (text: string): void {
-		console.log('In worker: ', text);
+		// console.log('In worker: ', text);
 		self.postMessage({ kind: 'print', text });
 	}
 };
