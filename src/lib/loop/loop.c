@@ -4,6 +4,7 @@
 /**
  * Provides emscripten_set_main_loop_arg and emscripten_cancel_main_loop
  */
+#include <pthread.h>
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
@@ -40,27 +41,6 @@ void loop_fn(void *arg)
     // usleep(500000);
 }
 
-int gotClick = 0;
-
-// REFERENCE https://github.com/emscripten-core/emscripten/blob/main/tests/test_html5_mouse.c
-EM_BOOL mouse_callback(int eventType, const EmscriptenMouseEvent *e, void *userData)
-{
-    gotClick += 1;
-    printf("WASM received click! %d\n", gotClick);
-
-    return 0;
-}
-
-const char *beforeunload_callback(int eventType, const void *reserved, void *userData)
-{
-    printf("Calling before unwind\n");
-    emscripten_cancel_main_loop();
-    // emscripten_force_exit(0);
-    // emscripten_exit_with_live_runtime();
-    // __builtin_trap();
-    return "";
-}
-
 int async_call_trial_count = 0;
 void async_call_trial(void *arg)
 {
@@ -74,21 +54,39 @@ void async_call_trial(void *arg)
     emscripten_async_call(async_call_trial, 0, 10);
 }
 
+void *sidecar_thread(void *arg)
+{
+    int i = 0;
+    while (i < 500)
+    {
+        // EM_ASM(console.log('hello from thread!'));
+        printf("hello from thread!\n");
+        i++;
+        usleep(100);
+    }
+    emscripten_force_exit(0);
+    __builtin_trap();
+}
+
 int main()
 {
+
+    // XXX FAILED!!! Issues:
+    // - Imports in worker.js file.
+    // - Have to override ability to find SharedArrayWorker
+    // - Seeing the build overflow issue with the worker.js file.
+    // - Thread pool size never large enough???
+    pthread_t thread;
+    pthread_create(&thread, NULL, sidecar_thread, NULL);
+
     /**
      *  'async' calls: only works when the main loop releases.
      */
-    emscripten_async_call(async_call_trial, 0, 10);
+    // emscripten_async_call(async_call_trial, 0, 10);
 
     /**
-     *  DOM Handlers
-     *
-     *  // XXX Does not work when embedded in web worker!!
+     *  DOM Handlers // XXX Does not work when embedded in web worker!!
      */
-    // EMSCRIPTEN_RESULT ret = emscripten_set_click_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, mouse_callback);
-    // emscripten_set_beforeunload_callback(0,
-    //                                      beforeunload_callback);
 
     /**
      *  Main Module

@@ -2038,34 +2038,6 @@ var createLoopModule = (() => {
 			return nowIsMonotonic;
 		}
 
-		/** @param {boolean=} synchronous */
-		function callUserCallback(func, synchronous) {
-			if (ABORT) {
-				err('user callback triggered after runtime exited or application aborted.  Ignoring.');
-				return;
-			}
-			// For synchronous calls, let any exceptions propagate, and don't let the runtime exit.
-			if (synchronous) {
-				func();
-				return;
-			}
-			try {
-				func();
-			} catch (e) {
-				handleException(e);
-			}
-		}
-
-		function runtimeKeepalivePush() {}
-
-		function runtimeKeepalivePop() {}
-		/** @param {number=} timeout */
-		function safeSetTimeout(func, timeout) {
-			return setTimeout(function () {
-				callUserCallback(func);
-			}, timeout);
-		}
-
 		function _emscripten_set_main_loop_timing(mode, value) {
 			Browser.mainLoop.timingMode = mode;
 			Browser.mainLoop.timingValue = value;
@@ -2130,6 +2102,8 @@ var createLoopModule = (() => {
 
 		var _emscripten_get_now;
 		_emscripten_get_now = () => performance.now();
+		function runtimeKeepalivePush() {}
+
 		function _exit(status) {
 			// void _exit(int status);
 			// http://pubs.opengroup.org/onlinepubs/000095399/functions/exit.html
@@ -2247,6 +2221,32 @@ var createLoopModule = (() => {
 			if (simulateInfiniteLoop) {
 				throw 'unwind';
 			}
+		}
+
+		/** @param {boolean=} synchronous */
+		function callUserCallback(func, synchronous) {
+			if (ABORT) {
+				err('user callback triggered after runtime exited or application aborted.  Ignoring.');
+				return;
+			}
+			// For synchronous calls, let any exceptions propagate, and don't let the runtime exit.
+			if (synchronous) {
+				func();
+				return;
+			}
+			try {
+				func();
+			} catch (e) {
+				handleException(e);
+			}
+		}
+
+		function runtimeKeepalivePop() {}
+		/** @param {number=} timeout */
+		function safeSetTimeout(func, timeout) {
+			return setTimeout(function () {
+				callUserCallback(func);
+			}, timeout);
 		}
 		var Browser = {
 			mainLoop: {
@@ -2957,21 +2957,17 @@ var createLoopModule = (() => {
 				}
 			}
 		};
-		function _emscripten_async_call(func, arg, millis) {
-			function wrapper() {
-				getWasmTableEntry(func)(arg);
-			}
-
-			if (millis >= 0) {
-				safeSetTimeout(wrapper, millis);
-			} else {
-				Browser.safeRequestAnimationFrame(wrapper);
-			}
-		}
-
 		function _emscripten_cancel_main_loop() {
 			Browser.mainLoop.pause();
 			Browser.mainLoop.func = null;
+		}
+
+		function _emscripten_force_exit(status) {
+			warnOnce(
+				'emscripten_force_exit cannot actually shut down the runtime, as the build does not have EXIT_RUNTIME set'
+			);
+			noExitRuntime = false;
+			exit(status);
 		}
 
 		function _emscripten_memcpy_big(dest, src, num) {
@@ -3108,8 +3104,8 @@ var createLoopModule = (() => {
 		var asmLibraryArg = {
 			_emscripten_date_now: __emscripten_date_now,
 			_emscripten_get_now_is_monotonic: __emscripten_get_now_is_monotonic,
-			emscripten_async_call: _emscripten_async_call,
 			emscripten_cancel_main_loop: _emscripten_cancel_main_loop,
+			emscripten_force_exit: _emscripten_force_exit,
 			emscripten_get_now: _emscripten_get_now,
 			emscripten_memcpy_big: _emscripten_memcpy_big,
 			emscripten_set_main_loop_arg: _emscripten_set_main_loop_arg,

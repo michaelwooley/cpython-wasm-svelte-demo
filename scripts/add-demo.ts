@@ -11,6 +11,8 @@ const libs = {
 		'-sEXPORT_ES6=1',
 		'-sEXPORT_NAME=createLoopModule',
 		'-sENVIRONMENT=web,worker'
+		// '-pthread',
+		// '-sPTHREAD_POOL_SIZE_STRICT=20'
 		// '-D DEV=1' // Macro flag
 	],
 	add: [
