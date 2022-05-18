@@ -7,32 +7,6 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
-#ifdef DEV
-EM_JS(void, enable_auto_refresh_client, (void), {
-    var ws = null;
-    var to = null;
-    function conn()
-    {
-        ws = new WebSocket("ws://" + location.hostname + ":3000/");
-        ws.onmessage = function(m)
-        {
-            console.log(m.data);
-            clearTimeout(to);
-            to = setTimeout(
-                function() { location.reload(true); }, 1500);
-        };
-    }
-
-    try
-    {
-        conn();
-    }
-    catch (e)
-    {
-    }
-});
-#endif
-
 /**
  * A context structure that we can use for passing variables to our loop
  * function, in this case it just contains a single integer
@@ -94,11 +68,6 @@ int main()
     int fps = 10;
 
     ctx.x = 0;
-
-// REFERENCE https://github.com/nagalun/worldofpixels-client/blob/87ad64b9c8fb50b497eed6249c74e6a6152b03e0/src/main.cpp
-#ifdef DEV
-    enable_auto_refresh_client();
-#endif
 
     EMSCRIPTEN_RESULT ret = emscripten_set_click_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, 0, 1, mouse_callback);
     emscripten_set_beforeunload_callback(0,
