@@ -17,16 +17,11 @@ void (async function () {
 	// Building the module
 	const tic = performance.now();
 	await $`emcc add.c -o add.emcc.js \
-    -s EXPORTED_FUNCTIONS="['_main','_add']" \
-    -pthread \
-    -sPTHREAD_POOL_SIZE=1 \
-    -sPROXY_TO_PTHREAD \
-    -s MODULARIZE=1 \
+	 -s MODULARIZE=1 \
     -s EXPORT_ES6=1 \
     -s EXPORT_NAME=createAddModule \
-	-sENVIRONMENT=web,worker \
-    --pre-js add.post.emcc.js \
-	--post-js add.post.emcc.js`;
+	-sENVIRONMENT=web,worker;
+	`;
 	const compileTime = (performance.now() - tic) / 1000;
 
 	cd(baseDir);
